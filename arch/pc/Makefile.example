@@ -1,0 +1,60 @@
+#
+# Software License Agreement (BSD License)
+#
+# Copyright (c) 2017, DUKELEC, Inc.
+# All rights reserved.
+#
+# Author: Duke Fong <duke@dukelec.com>
+#
+
+# Copy this Makefile to the same path of 6locd library,
+# and create the main.c file
+
+INCLUDES = \
+6locd/net \
+6locd/utils \
+6locd/dev \
+6locd/arch/pc \
+usr
+
+C_SOURCES = \
+main.c \
+6locd/net/6lo_nd.c \
+6locd/net/6lo.c \
+6locd/net/6lo_dispatcher.c \
+6locd/dev/cdbus_uart.c \
+6locd/arch/pc/arch_wrapper.c \
+6locd/utils/list.c \
+6locd/utils/modbus_crc.c \
+6locd/arch/pc/app_skeleton.c
+
+GIT_VERSION := $(shell git describe --dirty --always --tags)
+
+CC = gcc
+
+BUILD_DIR = build
+TARGET = test_app
+
+OBJECTS = $(addprefix $(BUILD_DIR)/,$(notdir $(C_SOURCES:.c=.o)))
+vpath %.c $(sort $(dir $(C_SOURCES)))
+
+I_INCLUDES = $(foreach includedir,$(INCLUDES),-I$(includedir))
+CFLAGS = $(I_INCLUDES) -DSW_VER=\"$(GIT_VERSION)\"
+LDFLAGS =
+
+DEPS = $(foreach includedir,$(INCLUDES),$(wildcard $(includedir)/*.h))
+
+$(BUILD_DIR)/%.o: %.c $(DEPS) Makefile | $(BUILD_DIR)
+	$(CC) -c -o $@ $< $(CFLAGS)
+
+$(TARGET): $(OBJECTS)
+	gcc -o $@ $^ $(LDFLAGS)
+
+$(BUILD_DIR):
+	mkdir $@
+
+.PHONY: clean
+
+clean:
+	rm -rf $(BUILD_DIR) $(TARGET)
+
