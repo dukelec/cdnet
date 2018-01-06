@@ -124,7 +124,7 @@ static void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
     list_put(&cdctl_intf->tx_head, node);
 }
 
-static void cdctl_set_mac_filter(cd_intf_t *cd_intf, uint8_t filter)
+static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
 {
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     cdctl_write_reg(cdctl_intf, REG_FILTER, filter);
@@ -132,7 +132,7 @@ static void cdctl_set_mac_filter(cd_intf_t *cd_intf, uint8_t filter)
                     filter == 255 ? 255 : filter + 1);
 }
 
-static uint8_t cdctl_get_mac_filter(cd_intf_t *cd_intf)
+static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     return cdctl_read_reg(cdctl_intf, REG_FILTER);
@@ -176,8 +176,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->cd_intf.get_rx_node = cdctl_get_rx_node;
     intf->cd_intf.put_free_node = cdctl_put_free_node;
     intf->cd_intf.put_tx_node = cdctl_put_tx_node;
-    intf->cd_intf.set_mac_filter = cdctl_set_mac_filter;
-    intf->cd_intf.get_mac_filter = cdctl_get_mac_filter;
+    intf->cd_intf.set_filter = cdctl_set_filter;
+    intf->cd_intf.get_filter = cdctl_get_filter;
     intf->cd_intf.set_bond_rate = cdctl_set_bond_rate;
     intf->cd_intf.get_bond_rate = cdctl_get_bond_rate;
     intf->cd_intf.flush = cdctl_flush;
@@ -186,7 +186,6 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     list_head_init(&intf->rx_head);
     list_head_init(&intf->tx_head);
     intf->is_pending = false;
-    intf->t_wait = 0;
 #endif
 
 #ifdef CDCTL_I2C
@@ -207,7 +206,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     }
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
-    cdctl_set_mac_filter(&intf->cd_intf, 255);
+    cdctl_set_filter(&intf->cd_intf, 255);
     cdctl_flush(&intf->cd_intf);
 
     d_debug("cdctl %p: flags: %02x\n", intf,
@@ -240,39 +239,17 @@ void cdctl_task(cdctl_intf_t *intf)
         cd_frame_t *frame = container_of(node, cd_frame_t, node);
         d_verbose("cdctl %p: write frame\n", intf);
         cdctl_write_frame(intf, frame);
-        if (frame->dat[0] == 255) {
-            // wait random time if from_id = 255
-            intf->t_wait = 1 + rand() / (RAND_MAX / CDCTL_TX_WAIT_RANGE);
-            intf->t_last = get_systick();
-            intf->is_pending = true;
-        } else {
-            intf->t_wait = 0;
-            flags = cdctl_read_reg(intf, REG_INT_FLAG);
-            if (flags & BIT_FLAG_TX_BUF_CLEAN) {
-                cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
-            } else {
-                intf->t_wait = 0;
-                intf->is_pending = true;
-            }
-        }
+
+		flags = cdctl_read_reg(intf, REG_INT_FLAG);
+		if (flags & BIT_FLAG_TX_BUF_CLEAN)
+			cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
+		else
+			intf->is_pending = true;
         list_put(intf->free_head, node);
     }
 
     if (intf->is_pending) {
         flags = cdctl_read_reg(intf, REG_INT_FLAG);
-        if (intf->t_wait) {
-            if (flags & BIT_FLAG_BUS_IDLE) {
-                if (get_systick() - intf->t_last <= intf->t_wait)
-                    return;
-                intf->t_wait = 0;
-                d_verbose("cdctl %p: wait end\n", intf);
-            } else {
-                intf->t_wait = 1 + rand() / (RAND_MAX / CDCTL_TX_WAIT_RANGE);
-                intf->t_last = get_systick();
-                d_verbose("cdctl %p: re-wait\n", intf);
-                return;
-            }
-        }
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
             d_verbose("cdctl %p: trigger tx\n", intf);
             cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);

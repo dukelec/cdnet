@@ -8,33 +8,33 @@
  */
 
 #include "common.h"
-#include "6lo.h"
-#include "6lo_dispatcher.h"
+#include "cdnet.h"
+#include "port_dispatcher.h"
 
 
-void lo_dispatcher_task(lo_dispr_t *dispr)
+void port_dispatcher_task(port_dispr_t *dispr)
 {
-    lo_intf_t *intf = dispr->lo_intf;
+    cdnet_intf_t *intf = dispr->net_intf;
 
     // rx:
 
-    lo_rx(intf);
+    cdnet_rx(intf);
 
     while (true) {
         list_node_t *rx_node = list_get(&intf->rx_head);
         if (!rx_node)
             break;
-        lo_packet_t *pkt = container_of(rx_node, lo_packet_t, node);
+        cdnet_packet_t *pkt = container_of(rx_node, cdnet_packet_t, node);
 
-        if (intf->mac != 255 && pkt->pkt_type == LO_NH_UDP) {
+        if (intf->mac != 255 && pkt->pkt_type == PKT_TYPE_UDP) {
 
-            if (pkt->dst_udp_port >= 0xf000) {
+            if (pkt->dst_port >= CDNET_BASIC_PORT) {
                 list_node_t *item = dispr->udp_req_head.first;
                 while (item) {
                     udp_req_t *udp_req = container_of(item, udp_req_t, node);
-                    if (pkt->dst_udp_port >= udp_req->begin &&
-                            pkt->dst_udp_port < udp_req->end) {
-                        if (udp_req->is_active) {
+                    if (pkt->dst_port >= udp_req->begin &&
+                            pkt->dst_port < udp_req->end) {
+                        if (udp_req->A_en) {
                             list_put(&udp_req->A_head, rx_node);
                             rx_node = NULL;
                         }
@@ -46,7 +46,7 @@ void lo_dispatcher_task(lo_dispr_t *dispr)
                 list_node_t *item = dispr->udp_ser_head.first;
                 while (item) {
                     udp_ser_t *udp_ser = container_of(item, udp_ser_t, node);
-                    if (pkt->dst_udp_port == udp_ser->port) {
+                    if (pkt->dst_port == udp_ser->port) {
                         list_put(&udp_ser->A_head, rx_node);
                         rx_node = NULL;
                         break;
@@ -54,11 +54,11 @@ void lo_dispatcher_task(lo_dispr_t *dispr)
                     item = item->next;
                 }
             }
-        } else if (pkt->pkt_type == LO_NH_ICMP) {
+        } else if (pkt->pkt_type == PKT_TYPE_ICMP) {
             list_node_t *item = dispr->icmp_ser_head.first;
             while (item) {
                 icmp_ser_t *icmp_ser = container_of(item, icmp_ser_t, node);
-                if (pkt->icmp_type == icmp_ser->type) {
+                if (pkt->src_port == icmp_ser->type) {
                     list_put(&icmp_ser->A_head, rx_node);
                     rx_node = NULL;
                     break;
@@ -67,8 +67,10 @@ void lo_dispatcher_task(lo_dispr_t *dispr)
             }
         }
 
-        if (rx_node)
-            list_put(intf->free_head, rx_node); // TODO: return ICMP error
+        if (rx_node) {
+            list_put(intf->free_head, rx_node);
+            d_debug("port_dispr: drop rx...\n");
+        }
     }
 
     // tx:
@@ -81,10 +83,10 @@ void lo_dispatcher_task(lo_dispr_t *dispr)
                 list_node_t *node = list_get(&udp_req->V_head);
                 if (!node)
                     break;
-                lo_packet_t *pkt = container_of(node, lo_packet_t, node);
-                lo_fill_src_addr(intf, pkt);
-                pkt->dst_udp_port = udp_req->cur++;
-                if (udp_req->cur == udp_req->end)
+                cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
+                cdnet_fill_src_addr(intf, pkt);
+                pkt->dst_port = udp_req->cur++;
+                if (udp_req->cur >= udp_req->end)
                     udp_req->cur = udp_req->begin;
                 list_put(&intf->tx_head, node);
             }
@@ -96,11 +98,11 @@ void lo_dispatcher_task(lo_dispr_t *dispr)
         list_node_t *node = list_get(&dispr->V_ser_head);
         if (!node)
             break;
-        lo_packet_t *pkt = container_of(node, lo_packet_t, node);
-        lo_exchange_src_dst(intf, pkt);
+        cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
+        cdnet_exchange_src_dst(intf, pkt);
         list_put(&intf->tx_head, node);
     }
 
-    lo_tx(intf);
+    cdnet_tx(intf);
 }
 

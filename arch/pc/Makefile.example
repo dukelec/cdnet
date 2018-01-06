@@ -11,22 +11,21 @@
 # and create the main.c file
 
 INCLUDES = \
-6locd/net \
-6locd/utils \
-6locd/dev \
-6locd/arch/pc \
+cdnet/net \
+cdnet/utils \
+cdnet/dev \
+cdnet/arch/pc \
 usr
 
 C_SOURCES = \
 main.c \
-6locd/net/6lo_nd.c \
-6locd/net/6lo.c \
-6locd/net/6lo_dispatcher.c \
-6locd/dev/cdbus_uart.c \
-6locd/arch/pc/arch_wrapper.c \
-6locd/utils/list.c \
-6locd/utils/modbus_crc.c \
-6locd/arch/pc/app_skeleton.c
+cdnet/net/cdnet.c \
+cdnet/net/port_dispatcher.c \
+cdnet/dev/cdbus_uart.c \
+cdnet/arch/pc/arch_wrapper.c \
+cdnet/utils/list.c \
+cdnet/utils/modbus_crc.c \
+cdnet/arch/pc/app_skeleton.c
 
 GIT_VERSION := $(shell git describe --dirty --always --tags)
 

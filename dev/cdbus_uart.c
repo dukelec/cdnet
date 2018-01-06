@@ -11,10 +11,6 @@
 #include "modbus_crc.h"
 #include "cdbus_uart.h"
 
-#if defined(CDUART_TX_IT) || defined(CDUART_RX_IT)
-#define CDUART_IT
-#endif
-
 #ifdef CDUART_IT
 #define cduart_irq_save(flags)    local_irq_save(flags)
 #define cduart_irq_restore(flags) local_irq_restore(flags)
@@ -99,7 +95,7 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
     intf->rx_byte_cnt = 0;
 
     // filters should set by caller
-    intf->cd_intf.set_mac_filter = NULL;
+    intf->cd_intf.set_filter = NULL;
     intf->remote_filter_len = 0;
     intf->local_filter_len = 0;
 #endif

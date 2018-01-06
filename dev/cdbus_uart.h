@@ -11,10 +11,21 @@
 #define __CDBUS_UART_H__
 
 #include "common.h"
-#include "6lo.h"
+#include "cdnet.h"
 
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME     500
+#endif
+
+#ifdef CDUART_IT
+#define CDUART_RX_IT
+#define CDUART_TX_IT
+#endif
+
+#if defined(CDUART_TX_IT) || defined(CDUART_RX_IT)
+#ifndef CDUART_IT
+#define CDUART_IT
+#endif
 #endif
 
 

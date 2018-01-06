@@ -9,12 +9,10 @@
 
 #include "common.h"
 #include "cdctl_bx.h"
-#include "6lo_dispatcher.h"
-#include "6lo_nd.h"
+#include "port_dispatcher.h"
 #include "main.h"
 
 
-extern ADC_HandleTypeDef hadc1;
 extern UART_HandleTypeDef huart1;
 extern SPI_HandleTypeDef hspi1;
 
@@ -27,14 +25,13 @@ static spi_t cdctl_spi = { .hspi = &hspi1, .ns_pin = &cdctl_ns };
 static cd_frame_t cd_frame_alloc[CD_FRAME_MAX];
 static list_head_t cd_free_head = {0};
 
-#define LO_PACKET_MAX 10
-static lo_packet_t lo_packet_alloc[LO_PACKET_MAX];
-static list_head_t lo_free_head = {0};
+#define NET_PACKET_MAX 10
+static cdnet_packet_t net_packet_alloc[NET_PACKET_MAX];
+static list_head_t net_free_head = {0};
 
 static cdctl_intf_t cdctl_intf = {0};
-static lo_intf_t lo_intf = {0};
-static lo_dispr_t lo_dispr = {0};
-static lo_nd_t lo_nd = {0};
+static cdnet_intf_t net_intf = {0};
+static port_dispr_t port_dispr = {0};
 static udp_ser_t dev_info_ser = {0};
 
 
@@ -43,17 +40,15 @@ static void net_init(void)
     int i;
     for (i = 0; i < CD_FRAME_MAX; i++)
         list_put(&cd_free_head, &cd_frame_alloc[i].node);
-    for (i = 0; i < LO_PACKET_MAX; i++)
-        list_put(&lo_free_head, &lo_packet_alloc[i].node);
+    for (i = 0; i < NET_PACKET_MAX; i++)
+        list_put(&net_free_head, &net_packet_alloc[i].node);
 
     cdctl_intf_init(&cdctl_intf, &cd_free_head, &cdctl_spi);
-    lo_intf_init(&lo_intf, &lo_free_head, &cdctl_intf.cd_intf, 255);
-    lo_dispatcher_init(&lo_dispr, &lo_intf);
+    cdnet_intf_init(&net_intf, &net_free_head, &cdctl_intf.cd_intf, 254);
+    port_dispatcher_init(&port_dispr, &net_intf);
 
-    lo_nd_init(&lo_nd, &lo_intf, &lo_dispr);
-
-    dev_info_ser.port = 1000; // listen on UDP port 1000
-    list_put(&lo_dispr.udp_ser_head, &dev_info_ser.node);
+    dev_info_ser.port = 1; // listen on UDP port 1
+    list_put(&port_dispr.udp_ser_head, &dev_info_ser.node);
 }
 
 static void dev_info_ser_cb(void)
@@ -62,7 +57,7 @@ static void dev_info_ser_cb(void)
 
     list_node_t *node = list_get(&dev_info_ser.A_head);
     if (node) {
-        lo_packet_t *pkt = container_of(node, lo_packet_t, node);
+        cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
 
         // M: model; S: serial string; HW: hardware version; SW: software version
         sprintf(info_str, "M: uf_xxx; S: 5563c3ea3380; HW: v0.1; SW: v0.1");
@@ -70,24 +65,14 @@ static void dev_info_ser_cb(void)
         // filter string by input data
         if (pkt->dat_len != 0) {
             if (strstr(info_str, (char *)pkt->dat) == NULL) {
-                list_put(lo_intf.free_head, &pkt->node);
+                list_put(net_intf.free_head, &pkt->node);
                 return;
             }
         }
 
         strcpy((char *)pkt->dat, info_str);
         pkt->dat_len = strlen(info_str);
-        list_put(&lo_dispr.V_ser_head, node);
-    }
-}
-
-static void init_rand(void)
-{
-    int i;
-    for (i = 0; i < 50; i++) {
-        HAL_ADC_Start(&hadc1);
-        HAL_ADC_PollForConversion(&hadc1, HAL_MAX_DELAY);
-        srand(rand() + HAL_ADC_GetValue(&hadc1));
+        list_put(&port_dispr.V_ser_head, node);
     }
 }
 
@@ -95,14 +80,11 @@ void net_task(void)
 {
     debug_init();
     net_init();
-    init_rand();
-    d_debug("rand(): %d\n", rand());
 
     while (true) {
         cdctl_task(&cdctl_intf);
-        lo_dispatcher_task(&lo_dispr);
+        port_dispatcher_task(&port_dispr);
 
-        nd_task(&lo_nd);
         dev_info_ser_cb();
         // app2 ...
         // ...

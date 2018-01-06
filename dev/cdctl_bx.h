@@ -11,11 +11,7 @@
 #define __CDCTL_BX_H__
 
 #include "common.h"
-#include "6lo.h"
-
-#ifndef CDCTL_TX_WAIT_RANGE
-#define CDCTL_TX_WAIT_RANGE 100
-#endif
+#include "cdnet.h"
 
 
 typedef struct {
@@ -25,8 +21,6 @@ typedef struct {
     list_head_t tx_head;
 
     bool        is_pending;
-    uint32_t    t_wait; // for from = 255 only, reset waiting timer if bus busy
-    uint32_t    t_last;
 
 #ifdef CDCTL_I2C
     i2c_t       *i2c;
