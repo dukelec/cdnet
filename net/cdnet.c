@@ -70,13 +70,13 @@ static int cdnet_to_frame(cdnet_intf_t *intf,
     } else {
         *buf++ |= HDR_STANDARD | (pkt->is_compressed ? HDR_COMPRESSED : 0);
         if (!pkt->is_local) {
-            buf[3] |= HDR_FULL_ADDR | (pkt->is_multicast ? HDR_MULTICAST : 0);
+            buf_s[3] |= HDR_FULL_ADDR | (pkt->is_multicast ? HDR_MULTICAST : 0);
             *buf++ = pkt->src_addr[0];
             *buf++ = pkt->src_addr[1];
             *buf++ = pkt->dst_addr[0];
             *buf++ = pkt->dst_addr[1];
         } else if (pkt->is_multicast) {
-            buf[3] |= HDR_MULTICAST;
+            buf_s[3] |= HDR_MULTICAST;
             *buf++ = pkt->dst_addr[1];
         }
 
@@ -100,13 +100,13 @@ static int cdnet_to_frame(cdnet_intf_t *intf,
                 pkt->in_fragment = true;
                 pkt->frag_cnt = 0;
                 cal_dat_len = left_data_len - (cal_frame_len - 256);
-                buf[3] |= HDR_FRAGMENT;
+                buf_s[3] |= HDR_FRAGMENT;
                 *buf++ = pkt->frag_cnt++;
             } else {
                 cal_dat_len = left_data_len;
             }
         } else {
-            buf[3] |= HDR_FRAGMENT;
+            buf_s[3] |= HDR_FRAGMENT;
             skip_appends = true;
 
             if (cal_frame_len > 256) {
@@ -125,7 +125,7 @@ static int cdnet_to_frame(cdnet_intf_t *intf,
 
         if (pkt->pkt_type != PKT_TYPE_UDP) {
             assert(pkt->pkt_type <= PKT_TYPE_END);
-            buf[3] |= HDR_FURTHER_PROT;
+            buf_s[3] |= HDR_FURTHER_PROT;
             if (!skip_appends)
                 *buf++ = pkt->pkt_type;
         }
@@ -134,12 +134,12 @@ static int cdnet_to_frame(cdnet_intf_t *intf,
             *buf++ = pkt->src_port & 0xff; // type if icmp
             if (pkt->src_port & 0xff00) {
                 *buf++ = pkt->src_port >> 8;
-                buf[3] |= HDR_SRC_PORT_16;
+                buf_s[3] |= HDR_SRC_PORT_16;
             }
             *buf++ = pkt->dst_port & 0xff; // code if icmp
             if (pkt->dst_port & 0xff00) {
                 *buf++ = pkt->dst_port >> 8;
-                buf[3] |= HDR_DST_PORT_16;
+                buf_s[3] |= HDR_DST_PORT_16;
             }
         }
     }
@@ -168,15 +168,15 @@ static int cdnet_from_frame(cdnet_intf_t *intf,
         pkt->frag_at = pkt->dat;
         pkt->dat_len = 0;
 
-        if (!(buf[3] & HDR_STANDARD)) { // basic format
+        if (!(buf_s[3] & HDR_STANDARD)) { // basic format
             pkt->is_local = true;
             pkt->is_multicast = false;
             pkt->is_compressed = false;
 
-            if (buf[3] & HDR_BASIC_REPLY) { // in reply
+            if (buf_s[3] & HDR_BASIC_REPLY) { // in reply
                 pkt->src_port = intf->last_basic_port;
                 pkt->dst_port = CDNET_BASIC_PORT;
-                if (buf[3] & HDR_BASIC_SHARE) {
+                if (buf_s[3] & HDR_BASIC_SHARE) {
                     *pkt->frag_at++ = *buf++ & 0x1f;
                     pkt->dat_len++;
                 }
@@ -187,38 +187,38 @@ static int cdnet_from_frame(cdnet_intf_t *intf,
         } else { // standard format
             pkt->is_local = true;
             pkt->is_multicast = false;
-            pkt->is_compressed = !!(buf[3] & HDR_COMPRESSED);
+            pkt->is_compressed = !!(buf_s[3] & HDR_COMPRESSED);
 
-            if (buf[3] & HDR_FULL_ADDR) {
+            if (buf_s[3] & HDR_FULL_ADDR) {
                 pkt->is_local = false;
-                pkt->is_multicast = !!(buf[3] & HDR_MULTICAST);
+                pkt->is_multicast = !!(buf_s[3] & HDR_MULTICAST);
                 pkt->src_addr[0] = *buf++;
                 pkt->src_addr[1] = *buf++;
                 pkt->dst_addr[0] = *buf++;
                 pkt->dst_addr[1] = *buf++;
-            } else if (buf[3] & HDR_MULTICAST) {
+            } else if (buf_s[3] & HDR_MULTICAST) {
                 pkt->is_multicast = true;
                 pkt->dst_addr[1] = *buf++;
             }
 
             pkt->frag_cnt = 0;
-            if (buf[3] & HDR_FRAGMENT) {
+            if (buf_s[3] & HDR_FRAGMENT) {
                 if (*buf++ != 0)
                     return ERR_PKT_ORDER;
                 ret_val = RET_NOT_FINISH;
                 pkt->in_fragment = true;
             }
 
-            if (buf[3] & HDR_FURTHER_PROT) {
+            if (buf_s[3] & HDR_FURTHER_PROT) {
                 pkt->pkt_type = *buf++;
                 assert(pkt->pkt_type <= PKT_TYPE_END);
             }
 
             pkt->src_port = *buf++;
-            if (buf[3] & HDR_SRC_PORT_16)
+            if (buf_s[3] & HDR_SRC_PORT_16)
                 pkt->src_port |= *buf++ << 8;
             pkt->dst_port = *buf++;
-            if (buf[3] & HDR_DST_PORT_16)
+            if (buf_s[3] & HDR_DST_PORT_16)
                 pkt->dst_port |= *buf++ << 8;
         }
 
@@ -228,12 +228,12 @@ static int cdnet_from_frame(cdnet_intf_t *intf,
         if (pkt->dst_mac != *buf++)
             return RET_PKT_NOT_MATCH;
         payload_len = *buf++;
-        assert((buf[3] & HDR_STANDARD) != 0);
+        assert((buf_s[3] & HDR_STANDARD) != 0);
 
-        if (pkt->is_multicast != !!(buf[3] & HDR_MULTICAST))
+        if (pkt->is_multicast != !!(buf_s[3] & HDR_MULTICAST))
             return RET_PKT_NOT_MATCH;
 
-        if (buf[3] & HDR_FULL_ADDR) {
+        if (buf_s[3] & HDR_FULL_ADDR) {
             if (pkt->is_local != false)
                 return RET_PKT_NOT_MATCH;
             if (pkt->src_addr[0] != *buf++)
@@ -247,13 +247,13 @@ static int cdnet_from_frame(cdnet_intf_t *intf,
         } else {
             if (pkt->is_local != true)
                 return RET_PKT_NOT_MATCH;
-            if (buf[3] & HDR_MULTICAST) {
+            if (buf_s[3] & HDR_MULTICAST) {
                 if (pkt->dst_addr[1] != *buf++)
                     return RET_PKT_NOT_MATCH;
             }
         }
 
-        assert((buf[3] & HDR_FRAGMENT) != 0);
+        assert((buf_s[3] & HDR_FRAGMENT) != 0);
         if (*buf & HDR_FRAGMENT_END)
             pkt->in_fragment = false;
         else

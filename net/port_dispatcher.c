@@ -84,6 +84,7 @@ void port_dispatcher_task(port_dispr_t *dispr)
                 if (!node)
                     break;
                 cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
+                pkt->pkt_type = PKT_TYPE_UDP;
                 cdnet_fill_src_addr(intf, pkt);
                 pkt->dst_port = udp_req->cur++;
                 if (udp_req->cur >= udp_req->end)

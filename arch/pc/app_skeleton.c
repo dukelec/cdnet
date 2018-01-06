@@ -67,9 +67,11 @@ static list_node_t *dummy_get_rx_node(cd_intf_t *intf)
             d_debug("dummy: 55 rx done\n");
             list_put(&cd_setting_head, node);
         } else if (frame->dat[0] == 0x56) {
-            uint8_t i, l = frame->dat[2];
-            for (i = 0; i < l; i++)
-                frame->dat[i] = frame->dat[i + 3];
+            uint8_t i;
+            frame->dat[2] -= 2;
+            memcpy(frame->dat, frame->dat + 3, 2);
+            for (i = 0; i < frame->dat[2]; i++)
+                frame->dat[i + 3] = frame->dat[i + 5];
             d_debug("dummy: 56 rx done\n");
             list_put(&cd_proxy_head, node);
         } else {
@@ -91,11 +93,11 @@ static void dummy_put_tx_node(cd_intf_t *intf, list_node_t *node)
 
     } else if (intf == &cd_proxy_intf) {
         cd_frame_t *frame = container_of(node, cd_frame_t, node);
-        int i, l = frame->dat[2] + 3;
+        int i, l = frame->dat[2] + 2;
 
-        for (i = l - 1; i >= 0; i--) {
-            frame->dat[i + 3] = frame->dat[i];
-        }
+        for (i = l - 1; i >= 3; i--)
+            frame->dat[i + 2] = frame->dat[i];
+        memcpy(frame->dat + 3, frame->dat, 2);
         frame->dat[0] = 0xaa;
         frame->dat[1] = 0x56;
         frame->dat[2] = l;
