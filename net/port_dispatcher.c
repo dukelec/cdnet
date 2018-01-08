@@ -26,9 +26,9 @@ void port_dispatcher_task(port_dispr_t *dispr)
             break;
         cdnet_packet_t *pkt = container_of(rx_node, cdnet_packet_t, node);
 
-        if (intf->mac != 255 && pkt->pkt_type == PKT_TYPE_UDP) {
+        if (intf->mac != 255 && !pkt->is_level2) {
 
-            if (pkt->dst_port >= CDNET_BASIC_PORT) {
+            if (pkt->dst_port >= CDNET_DEF_PORT) {
                 list_node_t *item = dispr->udp_req_head.first;
                 while (item) {
                     udp_req_t *udp_req = container_of(item, udp_req_t, node);
@@ -54,17 +54,6 @@ void port_dispatcher_task(port_dispr_t *dispr)
                     item = item->next;
                 }
             }
-        } else if (pkt->pkt_type == PKT_TYPE_ICMP) {
-            list_node_t *item = dispr->icmp_ser_head.first;
-            while (item) {
-                icmp_ser_t *icmp_ser = container_of(item, icmp_ser_t, node);
-                if (pkt->src_port == icmp_ser->type) {
-                    list_put(&icmp_ser->A_head, rx_node);
-                    rx_node = NULL;
-                    break;
-                }
-                item = item->next;
-            }
         }
 
         if (rx_node) {
@@ -84,7 +73,7 @@ void port_dispatcher_task(port_dispr_t *dispr)
                 if (!node)
                     break;
                 cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
-                pkt->pkt_type = PKT_TYPE_UDP;
+                pkt->is_level2 = false;
                 cdnet_fill_src_addr(intf, pkt);
                 pkt->dst_port = udp_req->cur++;
                 if (udp_req->cur >= udp_req->end)

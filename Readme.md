@@ -1,29 +1,32 @@
 CDNET is a high layer protocol for CDBUS
 =======================================
 
-1. [Select Format](#select-format)
-2. [Basic Format](#basic-format)
-3. [Standard Format](#standard-format)
-4. [Port 0](#port-0)
-5. [Examples](#examples)
+1. [CDNET Levels](#cdnet-levels)
+2. [Level 0 Format](#level-0-format)
+3. [Level 1 Format](#level-1-format)
+4. [Level 2 Format](#level-2-format)
+5. [Port 0](#port-0)
+6. [Examples](#examples)
 
 
-## Select Format
+## CDNET Levels
+
+CDNET protocol has three different levels, select by bit7 and bit6 of first byte:
+
+| bit7 | bit6   | DESCRIPTION                                                   |
+|------|------- |---------------------------------------------------------------|
+| 0    | x      | Level 0: The simplest one, for single network communication   |
+| 1    | 0      | Level 1: Support cross network and multi-cast communication   |
+| 1    | 1      | Level 2: Raw TCP/IP communication between PCs                 |
+
+All devices have to support the Level 0, the Level 1 and Level 2 are optional.
+
+## Level 0 Format
 First byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------| 
-| [7]     | 0: basic format; 1: standard format               |
-
-All devices have to support the basic format, the standard format is optional.
-
-
-## Basic Format
-First byte:
-
-| FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
-| [7]     | Always 0: basic format                            |
+| [7]     | Always 0: Level 0                                 |
 | [6]     | 0: request; 1: reply                              |
 
 ### Request
@@ -31,7 +34,7 @@ First byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------| 
-| [7]     | Always 0: basic format                            |
+| [7]     | Always 0: Level 0                                 |
 | [6]     | Always 0: request                                 |
 | [5:0]   | dst_port, range 0~63                              |
 
@@ -44,7 +47,7 @@ First byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------| 
-| [7]     | Always 0: basic format                            |
+| [7]     | Always 0: Level 0                                 |
 | [6]     | Always 1: reply                                   |
 | [5]     | 0: not share; 1: [4:0] shared as first data byte  |
 | [4:0]   | Not care, or first data byte (must ≤ 31)          |
@@ -59,61 +62,75 @@ E.g.: reply `[0x40, 0x0c]` is the same as `[0x6c]`.
 
 The first byte shared part, and the second byte and after: reply status and/or datas.
 
-## Standard Format
+## Level 1 Format
 First byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------| 
-| [7]     | Always 1: standard format                         |
-| [6]     | FULL_ADDR                                         |
-| [5]     | MULTICAST                                         |
-| [4]     | FRAGMENT                                          |
+| [7]     | Always 1                                          |
+| [6]     | Always 0                                          |
+| [5]     | MULTI_NET                                         |
+| [4]     | MULTICAST                                         |
+| [3]     | Reserved                                          |
+| [2:0]   | PORT_SIZE                                         |
+
+Notes: All fields reserved in this document must be 0.
+
+### MULTI_NET & MULTICAST
+
+| MULTI_NET | MULTICAST | DESCRIPTION                                                                       |
+|-----------|-----------|-----------------------------------------------------------------------------------| 
+| 0         | 0         | Local net: append 0 byte                                                          |
+| 0         | 1         | Local net multicast: append 2 bytes `[multicast-id]`                              |
+| 1         | 0         | Cross net: append 4 bytes: `[src_net, src_id, dst_net, dst_id]`                   |
+| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_id, multicast-id]`            |
+
+Notes:
+ - Address from frame header equal to the `id` in same network.
+ - Broadcast could simply not use the MULTICAST bit.
+
+When communication with PC:
+ - The `net` is equal to byte 8 of IPv6 Unique Local Address.
+ - The `id` is equal to byte 16 of IPv6 Unique Local Address.
+
+### PORT_SIZE:
+
+| bit2 | bit1 | bit0   | SRC_PORT      | DST_PORT      |
+|------|------|--------|-------------------------------|
+| 0    | 0    | 0      | default port  | 1 byte        |
+| 0    | 0    | 1      | default port  | 2 bytes       |
+| 0    | 1    | 0      | 1 byte        | default port  |
+| 0    | 1    | 1      | 2 bytes       | default port  |
+| 1    | 0    | 0      | 1 byte        | 1 byte        |
+| 1    | 0    | 1      | 1 byte        | 2 bytes       |
+| 1    | 1    | 0      | 2 bytes       | 1 byte        |
+| 1    | 1    | 1      | 2 bytes       | 2 bytes       |
+
+Notes:
+ - Default port is `0xcdcd` for convention, it does not take up space,
+otherwise append 1 or 2 byte(s) for the src and dst port.
+ - CDNET is little endian.
+
+
+## Level 2 Format
+First byte:
+
+| FIELD   | DESCRIPTION                                       |
+|-------- |---------------------------------------------------| 
+| [7]     | Always 1                                          |
+| [6]     | Always 1                                          |
+| [5]     | FRAGMENT                                          |
+| [4]     | FRAGMENT_END                                      |
 | [3]     | COMPRESSED                                        |
-| [2]     | FURTHER_PROT                                      |
-| [1]     | SRC_PORT_16                                       |
-| [0]     | DST_PORT_16                                       |
-
-### FULL_ADDR
-0: local network, use the MAC address from frame header is enough;  
-1: cross multi-network, append 4 bytes after first byte:
-`[src_net_id, src_net_ip, dst_net_id, dst_net_ip]`
-
-Note: MAC address equal to IP address in same network.
-
-### MULTICAST
-0: not multicast;  
-1: multicast:  
- * If FULL_ADDR == 0: append 1 byte for `multicast-id`
- * If FULL_ADDR == 1:
-   - `dst_net_id` is used for `multicast-range`, 255 for all network
-   - `dst_net_ip` is used for `multicast-id`
+| [2:0]   | Reserved                                          |
 
 ### FRAGMENT
 0: not fragment;  
-1: fragment packet: append 1 byte for `fragment-id`,
-bit7 of `fragment-id`: 0 means more fragments follow; 1 means last fragment.
+1: fragment packet: append 1 byte for `fragment-id`.
 
-The futher append bytes for `FURTHER_PROT`, `src_port` and `dst_port` only carried in first fragment.
-
-### COMPRESSED
-0: not compressed;  
-1: compressed.
-
-### FURTHER_PROT
-0: default UDP protocol;  
-1: append 1 byte for more protocols: (only used for PC)
- - 1: TCP
- - 2: ICMP
-
-Note: Unused bits may be used to indicate the compression algorithm or other purpose.
-
-### SRC_PORT_16
-0: append 1 byte for `src_port`;  
-1: append 2 bytes for `src_port` (little endian).
-
-### DST_PORT_16
-0: append 1 byte for `dst_port`;  
-1: append 2 bytes for `dst_port` (little endian).
+### FRAGMENT_END:
+0: more fragments follow;  
+1: last fragment.
 
 
 ## Port 0
@@ -128,14 +145,14 @@ Tips: UDP port 0 on the PC can be mapped to other ports, e.g. port `0xcd00` in `
 Request device info:
  - local network
  - request: `0x0c` -> `0x0d` (MAC address)
- - replay: `0x0d` -> `0x0c`
+ - reply: `0x0d` -> `0x0c`
 
 Reply the device info string: `"M: c1; S: 1234"`,
 expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a, 0x20, 0x31, 0x32, 0x33, 0x34]`.
 
 Note: Conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
 
-The basic format:
+The Level 0 Format:
  * Request:
    - CDNET packet: `[0x00]` (`dst_port` = `0x00`, no arguments)
    - CDBUS frame: `[0x0c, 0x0d, 0x01, 0x00, crc_l, crc_h]`
@@ -143,13 +160,13 @@ The basic format:
    - CDNET packet: `[0x40, 0x4d, 0x3a, 0x20 ... 0x34]` (`0x40`: first data byte not shared with the head)
    - CDBUS frame: `[0x0d, 0x0c, 0x0f, 0x40, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
 
-The standard format:
- * Request: (port `0xff` is used here as an example, for PC, it's best to choose a larger port number, e.g.: `0xcdcd`)
-   - CDNET packet: `[0x80, 0xff, 0x00]` (`src_port` = `0xff`, `dst_port` = `0x00`, no arguments)
-   - CDBUS frame: `[0x0c, 0x0d, 0x03, 0x80, 0xff, 0x00, crc_l, crc_h]`
+The Level 1 Format:
+ * Request:
+   - CDNET packet: `[0x80, 0x00]` (`src_port` = default, `dst_port` = `0x00`, no arguments)
+   - CDBUS frame: `[0x0c, 0x0d, 0x02, 0x80, 0x00, crc_l, crc_h]`
  * Reply:
-   - CDNET packet: `[0x80, 0x00, 0xff, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x00`, `dst_port` = `0xff`)
-   - CDBUS frame: `[0x0d, 0x0c, 0x11, 0x80, 0x00, 0xff, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
+   - CDNET packet: `[0x82, 0x00, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x00`, `dst_port` = default)
+   - CDBUS frame: `[0x0d, 0x0c, 0x10, 0x82, 0x00, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
 
 
 ### Code Examples

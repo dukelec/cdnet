@@ -30,19 +30,12 @@ typedef struct {
     list_head_t A_head;
 } udp_ser_t;
 
-typedef struct {
-    list_node_t node;
-    uint8_t     type;
-    list_head_t A_head;
-} icmp_ser_t;
-
 
 typedef struct {
     cdnet_intf_t *net_intf;
 
     list_head_t udp_req_head;
     list_head_t udp_ser_head;
-    list_head_t icmp_ser_head;
 
     list_head_t V_ser_head;
 } port_dispr_t;

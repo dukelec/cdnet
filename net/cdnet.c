@@ -31,195 +31,301 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 #endif
 }
 
-static int cdnet_to_frame(cdnet_intf_t *intf,
+static int get_port_size(uint8_t val, uint8_t *src_size, uint8_t *dst_size)
+{
+    switch (val) {
+    case 0x00: *src_size = 0; *dst_size = 1; break;
+    case 0x01: *src_size = 0; *dst_size = 2; break;
+    case 0x02: *src_size = 1; *dst_size = 0; break;
+    case 0x03: *src_size = 2; *dst_size = 0; break;
+    case 0x04: *src_size = 1; *dst_size = 1; break;
+    case 0x05: *src_size = 1; *dst_size = 2; break;
+    case 0x06: *src_size = 2; *dst_size = 1; break;
+    case 0x07: *src_size = 2; *dst_size = 2; break;
+    default: return -1;
+    }
+    return 0;
+}
+
+static int cal_port_val(uint16_t src, uint16_t dst,
+        uint8_t *src_size, uint8_t *dst_size)
+{
+    if (src == CDNET_DEF_PORT)
+        *src_size = 0;
+    else if (src <= 0xff)
+        *src_size = 1;
+    else
+        *src_size = 2;
+
+    if (dst == CDNET_DEF_PORT)
+        *dst_size = 0;
+    else if (dst <= 0xff)
+        *dst_size = 1;
+    else
+        *dst_size = 2;
+
+    switch ((*src_size << 4) | *dst_size) {
+    case 0x01: return 0x00;
+    case 0x02: return 0x01;
+    case 0x10: return 0x02;
+    case 0x20: return 0x03;
+    case 0x11: return 0x04;
+    case 0x12: return 0x05;
+    case 0x21: return 0x06;
+    case 0x22: return 0x07;
+    default: return -1;
+    }
+}
+
+
+static int cdnet_l0_l1_to_frame(cdnet_intf_t *intf,
         cdnet_packet_t *pkt, uint8_t *buf)
 {
     int i;
-    int ret_val = 0;
+    int ret;
+    uint8_t src_port_size;
+    uint8_t dst_port_size;
+
     uint8_t *buf_s = buf;
-    uint16_t left_data_len;
-    uint16_t cal_frame_len;
-    uint16_t cal_dat_len;
-    bool skip_appends = false;
+    uint8_t *hdr = buf + 3;
+
+    assert(!pkt->is_level2);
 
     // CDBUS frame header: [src, dst, len]
     *buf++ = pkt->src_mac;
     *buf++ = pkt->dst_mac;
     buf++; // fill at end
 
-    // basic format
-    if (pkt->src_port == CDNET_BASIC_PORT ||
-            pkt->dst_port == CDNET_BASIC_PORT) {
-        cal_dat_len = pkt->dat_len;
-        pkt->frag_at = pkt->dat;
+    // level0
+    if (!pkt->is_multi_net && !pkt->is_multicast &&
+            ((pkt->src_port == CDNET_DEF_PORT && pkt->dst_port <= 63) ||
+                    pkt->dst_port == CDNET_DEF_PORT)) {
 
-        if (pkt->src_port == CDNET_BASIC_PORT) { // out request
-            assert(pkt->dst_port <= 63);
-            intf->last_basic_port = pkt->dst_port;
-            *buf++ = pkt->dst_port;
+        if (pkt->src_port == CDNET_DEF_PORT) { // out request
+            intf->last_level0_port = pkt->dst_port;
+            *buf++ = pkt->dst_port; // hdr
         } else { // out reply
             if (pkt->dat_len >= 1 && pkt->dat[0] <= 31) {
                 // share first byte
-                pkt->dat[0] |= HDR_BASIC_REPLY | HDR_BASIC_SHARE;
+                pkt->dat[0] |= HDR_L0_REPLY | HDR_L0_SHARE;
             } else {
-                *buf++ = HDR_BASIC_REPLY;
+                *buf++ = HDR_L0_REPLY; // hdr
             }
         }
 
-    // standard format
+    // level1
     } else {
-        *buf++ |= HDR_STANDARD | (pkt->is_compressed ? HDR_COMPRESSED : 0);
-        if (!pkt->is_local) {
-            buf_s[3] |= HDR_FULL_ADDR | (pkt->is_multicast ? HDR_MULTICAST : 0);
+        *buf++ = HDR_L1_L2; // hdr
+        if (pkt->is_multi_net) {
+            *hdr |= HDR_L1_MULTI_NET;
             *buf++ = pkt->src_addr[0];
             *buf++ = pkt->src_addr[1];
-            *buf++ = pkt->dst_addr[0];
-            *buf++ = pkt->dst_addr[1];
-        } else if (pkt->is_multicast) {
-            buf_s[3] |= HDR_MULTICAST;
-            *buf++ = pkt->dst_addr[1];
-        }
-
-        // fragmentation
-
-        if (!pkt->in_fragment)
-            left_data_len = pkt->dat_len;
-        else
-            left_data_len = pkt->dat_len - (pkt->frag_at - pkt->dat);
-
-        cal_frame_len = buf - buf_s + left_data_len;
-        cal_frame_len += (pkt->pkt_type == PKT_TYPE_UDP) ? 0 : 1;
-        cal_frame_len += (pkt->src_port & 0xff00) ? 2 : 1;
-        cal_frame_len += (pkt->dst_port & 0xff00) ? 2 : 1;
-
-        if (!pkt->in_fragment) {
-            pkt->frag_at = pkt->dat;
-
-            if (cal_frame_len > 256) {
-                ret_val = RET_NOT_FINISH;
-                pkt->in_fragment = true;
-                pkt->frag_cnt = 0;
-                cal_dat_len = left_data_len - (cal_frame_len - 256);
-                buf_s[3] |= HDR_FRAGMENT;
-                *buf++ = pkt->frag_cnt++;
-            } else {
-                cal_dat_len = left_data_len;
-            }
-        } else {
-            buf_s[3] |= HDR_FRAGMENT;
-            skip_appends = true;
-
-            if (cal_frame_len > 256) {
-                ret_val = RET_NOT_FINISH;
-                *buf++ = pkt->frag_cnt++;
-                assert((pkt->frag_cnt & HDR_FRAGMENT_END) == 0);
-                cal_dat_len = left_data_len - (cal_frame_len - 256);
-            } else {
-                assert((pkt->frag_cnt & HDR_FRAGMENT_END) == 0);
-                pkt->frag_cnt |= HDR_FRAGMENT_END;
-                *buf++ = pkt->frag_cnt;
-                pkt->in_fragment = false;
-                cal_dat_len = left_data_len;
+            if (!pkt->is_multicast) {
+                *buf++ = pkt->dst_addr[0];
+                *buf++ = pkt->dst_addr[1];
             }
         }
-
-        if (pkt->pkt_type != PKT_TYPE_UDP) {
-            assert(pkt->pkt_type <= PKT_TYPE_END);
-            buf_s[3] |= HDR_FURTHER_PROT;
-            if (!skip_appends)
-                *buf++ = pkt->pkt_type;
+        if (pkt->is_multicast) {
+            *hdr |= HDR_L1_MULTICAST;
+            *buf++ = pkt->multicast_id & 0xff;
+            *buf++ = pkt->multicast_id >> 8;
         }
 
-        if (!skip_appends) {
-            *buf++ = pkt->src_port & 0xff; // type if icmp
-            if (pkt->src_port & 0xff00) {
-                *buf++ = pkt->src_port >> 8;
-                buf_s[3] |= HDR_SRC_PORT_16;
-            }
-            *buf++ = pkt->dst_port & 0xff; // code if icmp
-            if (pkt->dst_port & 0xff00) {
-                *buf++ = pkt->dst_port >> 8;
-                buf_s[3] |= HDR_DST_PORT_16;
-            }
-        }
+        ret = cal_port_val(pkt->src_port, pkt->dst_port,
+                &src_port_size, &dst_port_size);
+        if (ret < 0)
+            return -1;
+
+        *hdr |= ret;
+        if (src_port_size >= 1)
+            *buf++ = pkt->src_port & 0xff;
+        if (src_port_size == 2)
+            *buf++ = pkt->src_port >> 8;
+        if (dst_port_size >= 1)
+            *buf++ = pkt->dst_port & 0xff;
+        if (dst_port_size == 2)
+            *buf++ = pkt->dst_port >> 8;
     }
 
-    assert(buf - buf_s + cal_dat_len <= 256);
-
-    for (i = 0; i < cal_dat_len; i++)
-        *buf++ = *pkt->frag_at++;
+    assert(buf - buf_s + pkt->dat_len <= 256);
+    for (i = 0; i < pkt->dat_len; i++)
+        *buf++ = pkt->dat[i];
     *(buf_s + 2) = buf - buf_s - 3;
-
-    return ret_val;
+    return 0;
 }
 
-static int cdnet_from_frame(cdnet_intf_t *intf,
+static int cdnet_l0_l1_from_frame(cdnet_intf_t *intf,
         const uint8_t *buf, cdnet_packet_t *pkt)
 {
     int i;
-    int ret_val = 0;
+    uint8_t src_port_size;
+    uint8_t dst_port_size;
+
     const uint8_t *buf_s = buf;
-    uint8_t payload_len;
+    const uint8_t *hdr = buf + 3;
+    uint8_t *cpy_to = pkt->dat;
+    uint8_t cpy_len;
+    uint8_t tmp_len;
+
+    assert((*hdr & 0xc0) != 0xc0);
+    pkt->is_level2 = false;
+
+    pkt->src_mac = *buf++;
+    pkt->dst_mac = *buf++;
+    tmp_len = *buf++;
+    assert(tmp_len >= 1);
+    pkt->dat_len = 0;
+    buf++; // skip hdr
+
+    pkt->is_multi_net = false;
+    pkt->is_multicast = false;
+
+    if (!(*hdr & HDR_L1_L2)) { // level0 format
+        pkt->dat_len = tmp_len - 1;
+        cpy_len = pkt->dat_len;
+
+        if (*hdr & HDR_L0_REPLY) { // in reply
+            pkt->src_port = intf->last_level0_port;
+            pkt->dst_port = CDNET_DEF_PORT;
+            if (*hdr & HDR_L0_SHARE) {
+                pkt->dat_len = tmp_len;
+                cpy_len = pkt->dat_len - 1;
+                *cpy_to++ = *hdr & 0x1f;
+            }
+        } else { // in request
+            pkt->src_port = CDNET_DEF_PORT;
+            pkt->dst_port = *hdr;
+        }
+    } else { // level1 format
+        if (*hdr & HDR_L1_MULTI_NET) {
+            pkt->is_multi_net = true;
+            pkt->src_addr[0] = *buf++;
+            pkt->src_addr[1] = *buf++;
+            if (!(*hdr & HDR_L1_MULTICAST)) {
+                pkt->dst_addr[0] = *buf++;
+                pkt->dst_addr[1] = *buf++;
+            }
+        }
+        if (*hdr & HDR_L1_MULTICAST) {
+            pkt->is_multicast = true;
+            pkt->multicast_id = *buf++;
+            pkt->multicast_id |= *buf++ << 8;
+        }
+
+        get_port_size(*hdr & 0x07, &src_port_size, &dst_port_size);
+
+        if (src_port_size >= 1)
+            pkt->src_port = *buf++;
+        if (src_port_size == 2)
+            pkt->src_port |= *buf++ << 8;
+        if (dst_port_size >= 1)
+            pkt->dst_port = *buf++;
+        if (dst_port_size == 2)
+            pkt->dst_port |= *buf++ << 8;
+
+        pkt->dat_len = tmp_len - (buf - buf_s - 3);
+        cpy_len = pkt->dat_len;
+    }
+
+    assert(pkt->dat_len >= 0);
+    for (i = 0; i < cpy_len; i++)
+        *cpy_to++ = *buf++;
+    return 0;
+}
+
+
+static int cdnet_l2_to_frame(cdnet_intf_t *intf,
+        cdnet_packet_t *pkt, uint8_t *buf)
+{
+    int i;
+    int ret = 0;
+    uint8_t *buf_s = buf;
+    uint8_t *hdr = buf + 3;
+    int left_data_len;
+    uint8_t cpy_len;
+
+    assert(pkt->is_level2);
+
+    // CDBUS frame header: [src, dst, len]
+    *buf++ = pkt->src_mac;
+    *buf++ = pkt->dst_mac;
+    buf++; // fill at end
+
+    *buf++ = HDR_L1_L2 | HDR_L2; // hdr
+
+    // fragmentation
+
+    if (!pkt->in_fragment)
+        left_data_len = pkt->dat_len;
+    else
+        left_data_len = pkt->dat_len - (pkt->frag_at - pkt->dat);
+
+    if (!pkt->in_fragment) {
+        pkt->frag_at = pkt->dat;
+
+        if (left_data_len + 1 > 253) { // 1: 1 byte header
+            ret = RET_NOT_FINISH;
+            cpy_len = 253 - 2; // 2: 2 bytes header include fragment-id
+            pkt->in_fragment = true;
+            *hdr |= HDR_L2_FRAGMENT;
+            *buf++ = pkt->frag_cnt = 0;
+        } else {
+            cpy_len = left_data_len;
+        }
+    } else {
+        if (left_data_len + 2 > 253) {
+            ret = RET_NOT_FINISH;
+            cpy_len = 253 - 2;
+            *hdr |= HDR_L2_FRAGMENT;
+            *buf++ = ++pkt->frag_cnt;
+            assert(pkt->frag_cnt != 0);
+        } else {
+            cpy_len = left_data_len;
+            pkt->in_fragment = false;
+            *hdr |= HDR_L2_FRAGMENT | HDR_L2_FRAGMENT_END;
+            *buf++ = ++pkt->frag_cnt;
+            assert(pkt->frag_cnt != 0);
+        }
+    }
+
+    assert(buf - buf_s + cpy_len <= 256);
+
+    for (i = 0; i < cpy_len; i++)
+        *buf++ = *pkt->frag_at++;
+    *(buf_s + 2) = buf - buf_s - 3;
+
+    return ret;
+}
+
+static int cdnet_l2_from_frame(cdnet_intf_t *intf,
+        const uint8_t *buf, cdnet_packet_t *pkt)
+{
+    int i;
+    int ret = 0;
+    const uint8_t *hdr = buf + 3;
+    uint8_t cpy_len;
+    uint8_t tmp_len;
+
+    assert((*hdr & 0xc0) == 0xc0);
+    pkt->is_level2 = true;
 
     if (!pkt->in_fragment) {
         pkt->src_mac = *buf++;
         pkt->dst_mac = *buf++;
-        payload_len = *buf++;
+        tmp_len = *buf++;
         pkt->frag_at = pkt->dat;
         pkt->dat_len = 0;
+        pkt->frag_cnt = 0;
+        buf++; // skip hdr
 
-        if (!(buf_s[3] & HDR_STANDARD)) { // basic format
-            pkt->is_local = true;
-            pkt->is_multicast = false;
-            pkt->is_compressed = false;
-
-            if (buf_s[3] & HDR_BASIC_REPLY) { // in reply
-                pkt->src_port = intf->last_basic_port;
-                pkt->dst_port = CDNET_BASIC_PORT;
-                if (buf_s[3] & HDR_BASIC_SHARE) {
-                    *pkt->frag_at++ = *buf++ & 0x1f;
-                    pkt->dat_len++;
-                }
-            } else { // in request
-                pkt->src_port = CDNET_BASIC_PORT;
-                pkt->dst_port = *buf++;
-            }
-        } else { // standard format
-            pkt->is_local = true;
-            pkt->is_multicast = false;
-            pkt->is_compressed = !!(buf_s[3] & HDR_COMPRESSED);
-
-            if (buf_s[3] & HDR_FULL_ADDR) {
-                pkt->is_local = false;
-                pkt->is_multicast = !!(buf_s[3] & HDR_MULTICAST);
-                pkt->src_addr[0] = *buf++;
-                pkt->src_addr[1] = *buf++;
-                pkt->dst_addr[0] = *buf++;
-                pkt->dst_addr[1] = *buf++;
-            } else if (buf_s[3] & HDR_MULTICAST) {
-                pkt->is_multicast = true;
-                pkt->dst_addr[1] = *buf++;
-            }
-
-            pkt->frag_cnt = 0;
-            if (buf_s[3] & HDR_FRAGMENT) {
-                if (*buf++ != 0)
-                    return ERR_PKT_ORDER;
-                ret_val = RET_NOT_FINISH;
-                pkt->in_fragment = true;
-            }
-
-            if (buf_s[3] & HDR_FURTHER_PROT) {
-                pkt->pkt_type = *buf++;
-                assert(pkt->pkt_type <= PKT_TYPE_END);
-            }
-
-            pkt->src_port = *buf++;
-            if (buf_s[3] & HDR_SRC_PORT_16)
-                pkt->src_port |= *buf++ << 8;
-            pkt->dst_port = *buf++;
-            if (buf_s[3] & HDR_DST_PORT_16)
-                pkt->dst_port |= *buf++ << 8;
+        if (*hdr & HDR_L2_FRAGMENT) {
+            if (*buf++ != 0) // fragment-id
+                return ERR_PKT_ORDER;
+            ret = RET_NOT_FINISH;
+            pkt->in_fragment = true;
+            cpy_len = tmp_len - 2;
+        } else {
+            cpy_len = tmp_len - 1;
         }
 
     } else { // segment
@@ -227,48 +333,24 @@ static int cdnet_from_frame(cdnet_intf_t *intf,
             return RET_PKT_NOT_MATCH;
         if (pkt->dst_mac != *buf++)
             return RET_PKT_NOT_MATCH;
-        payload_len = *buf++;
-        assert((buf_s[3] & HDR_STANDARD) != 0);
+        tmp_len = *buf++;
+        cpy_len = tmp_len - 2;
+        buf++; // skip hdr
 
-        if (pkt->is_multicast != !!(buf_s[3] & HDR_MULTICAST))
-            return RET_PKT_NOT_MATCH;
-
-        if (buf_s[3] & HDR_FULL_ADDR) {
-            if (pkt->is_local != false)
-                return RET_PKT_NOT_MATCH;
-            if (pkt->src_addr[0] != *buf++)
-                return RET_PKT_NOT_MATCH;
-            if (pkt->src_addr[1] != *buf++)
-                return RET_PKT_NOT_MATCH;
-            if (pkt->dst_addr[0] != *buf++)
-                return RET_PKT_NOT_MATCH;
-            if (pkt->dst_addr[1] != *buf++)
-                return RET_PKT_NOT_MATCH;
-        } else {
-            if (pkt->is_local != true)
-                return RET_PKT_NOT_MATCH;
-            if (buf_s[3] & HDR_MULTICAST) {
-                if (pkt->dst_addr[1] != *buf++)
-                    return RET_PKT_NOT_MATCH;
-            }
-        }
-
-        assert((buf_s[3] & HDR_FRAGMENT) != 0);
-        if (*buf & HDR_FRAGMENT_END)
+        assert(*hdr & HDR_L2_FRAGMENT);
+        if (*hdr & HDR_L2_FRAGMENT_END)
             pkt->in_fragment = false;
         else
-            ret_val = RET_NOT_FINISH;
+            ret = RET_NOT_FINISH;
 
-        if (pkt->frag_cnt++ != (*buf++ & ~HDR_FRAGMENT_END))
+        if (++pkt->frag_cnt != *buf++)
             return ERR_PKT_ORDER;
     }
 
-    payload_len -= (buf - buf_s - 3);
-    pkt->dat_len += payload_len;
-    for (i = 0; i < payload_len; i++)
+    pkt->dat_len += cpy_len;
+    for (i = 0; i < cpy_len; i++)
         *pkt->frag_at++ = *buf++;
-
-    return ret_val;
+    return ret;
 }
 
 
@@ -278,6 +360,7 @@ void cdnet_exchange_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
     uint8_t tmp_addr[2];
     uint8_t tmp_mac;
+    uint16_t tmp_port;
 
     tmp_mac = pkt->src_mac;
     pkt->src_mac = pkt->dst_mac;
@@ -286,29 +369,27 @@ void cdnet_exchange_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     if (pkt->is_multicast)
         pkt->src_mac = intf->mac;
 
-    if (!pkt->is_local) {
+    if (pkt->is_multi_net) {
         memcpy(tmp_addr, pkt->src_addr, 2);
         memcpy(pkt->src_addr, pkt->dst_addr, 2);
         memcpy(pkt->dst_addr, tmp_addr, 2);
         if (pkt->is_multicast) {
-            pkt->src_addr[0] = intf->net_id;
+            pkt->src_addr[0] = intf->net;
             pkt->src_addr[1] = intf->mac;
         }
     }
 
-    if (pkt->pkt_type != PKT_TYPE_ICMP) {
-        uint16_t tmp_port = pkt->src_port;
-        pkt->src_port = pkt->dst_port;
-        pkt->dst_port = tmp_port;
-    }
+    tmp_port = pkt->src_port;
+    pkt->src_port = pkt->dst_port;
+    pkt->dst_port = tmp_port;
 }
 
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
     pkt->src_mac = intf->mac;
 
-    if (!pkt->is_local) {
-        pkt->src_addr[0] = intf->net_id;
+    if (pkt->is_multi_net) {
+        pkt->src_addr[0] = intf->net;
         pkt->src_addr[1] = intf->mac;
     }
 }
@@ -343,7 +424,10 @@ void cdnet_rx(cdnet_intf_t *intf)
                 net_pkt->in_fragment = false;
             }
 
-            ret_val = cdnet_from_frame(intf, cd_frame->dat, net_pkt);
+            if ((cd_frame->dat[3] & 0xc0) == 0xc0)
+                ret_val = cdnet_l2_from_frame(intf, cd_frame->dat, net_pkt);
+            else
+                ret_val = cdnet_l0_l1_from_frame(intf, cd_frame->dat, net_pkt);
 
             // TODO: add timeout counter for pkt
             if (ret_val == RET_PKT_NOT_MATCH)
@@ -397,7 +481,10 @@ void cdnet_tx(cdnet_intf_t *intf)
             net_pkt->in_fragment = false;
         }
 
-        ret_val = cdnet_to_frame(intf, net_pkt, cd_frame->dat);
+        if (net_pkt->is_level2)
+            ret_val = cdnet_l2_to_frame(intf, net_pkt, cd_frame->dat);
+        else
+            ret_val = cdnet_l0_l1_to_frame(intf, net_pkt, cd_frame->dat);
 
         if (ret_val == 0 || ret_val == RET_NOT_FINISH) {
             cd_intf->put_tx_node(cd_intf, cd_node);
