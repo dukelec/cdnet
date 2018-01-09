@@ -28,7 +28,8 @@ void port_dispatcher_task(port_dispr_t *dispr)
 
         if (intf->mac != 255 && !pkt->is_level2) {
 
-            if (pkt->dst_port >= CDNET_DEF_PORT) {
+            if (pkt->src_port < CDNET_DEF_PORT &&
+                    pkt->dst_port >= CDNET_DEF_PORT) {
                 list_node_t *item = dispr->udp_req_head.first;
                 while (item) {
                     udp_req_t *udp_req = container_of(item, udp_req_t, node);
@@ -42,7 +43,8 @@ void port_dispatcher_task(port_dispr_t *dispr)
                     }
                     item = item->next;
                 }
-            } else {
+            } else if (pkt->src_port >= CDNET_DEF_PORT &&
+                    pkt->dst_port < CDNET_DEF_PORT) {
                 list_node_t *item = dispr->udp_ser_head.first;
                 while (item) {
                     udp_ser_t *udp_ser = container_of(item, udp_ser_t, node);

@@ -22,8 +22,8 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
     intf->cd_intf = cd_intf;
 
 #ifdef USE_DYNAMIC_INIT
-    intf->net_id = 0;
-    intf->last_basic_port = 0;
+    intf->net = 0;
+    intf->last_level0_port = 0;
     list_head_init(&intf->rx_head);
     list_head_init(&intf->tx_head);
     list_head_init(&intf->rx_frag_head);
