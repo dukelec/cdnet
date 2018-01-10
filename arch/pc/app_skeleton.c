@@ -95,7 +95,7 @@ static void dummy_put_tx_node(cd_intf_t *intf, list_node_t *node)
         cd_frame_t *frame = container_of(node, cd_frame_t, node);
         int i, l = frame->dat[2] + 2;
 
-        for (i = l - 1; i >= 3; i--)
+        for (i = l; i >= 3; i--)
             frame->dat[i + 2] = frame->dat[i];
         memcpy(frame->dat + 3, frame->dat, 2);
         frame->dat[0] = 0xaa;
