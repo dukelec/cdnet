@@ -27,13 +27,16 @@ typedef struct {
 #else
     spi_t       *spi;
 #endif
+    gpio_t      *rst_n;
 } cdctl_intf_t;
 
 
 #ifdef CDCTL_I2C
-void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head, i2c_t *i2c);
+void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
+        i2c_t *i2c, gpio_t *rst_n);
 #else
-void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head, spi_t *spi);
+void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
+        spi_t *spi, gpio_t *rst_n);
 #endif
 
 void cdctl_task(cdctl_intf_t *intf);

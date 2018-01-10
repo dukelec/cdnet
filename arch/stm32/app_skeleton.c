@@ -43,7 +43,7 @@ static void net_init(void)
     for (i = 0; i < NET_PACKET_MAX; i++)
         list_put(&net_free_head, &net_packet_alloc[i].node);
 
-    cdctl_intf_init(&cdctl_intf, &cd_free_head, &cdctl_spi);
+    cdctl_intf_init(&cdctl_intf, &cd_free_head, &cdctl_spi, NULL);
     cdnet_intf_init(&net_intf, &net_free_head, &cdctl_intf.cd_intf, 254);
     port_dispatcher_init(&port_dispr, &net_intf);
 

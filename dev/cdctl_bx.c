@@ -166,9 +166,9 @@ static void cdctl_flush(cd_intf_t *cd_intf)
 
 void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 #ifdef CDCTL_I2C
-        i2c_t *i2c)
+        i2c_t *i2c, gpio_t *rst_n)
 #else
-        spi_t *spi)
+        spi_t *spi, gpio_t *rst_n)
 #endif
 {
     intf->free_head = free_head;
@@ -193,6 +193,12 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 #else
     intf->spi = spi;
 #endif
+    intf->rst_n = rst_n;
+
+    if (rst_n) {
+        gpio_set_value(rst_n, 0);
+        gpio_set_value(rst_n, 1);
+    }
 
     while (true) {
         uint8_t ver = cdctl_read_reg(intf, REG_VERSION);
