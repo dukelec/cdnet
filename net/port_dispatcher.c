@@ -26,7 +26,7 @@ void port_dispatcher_task(port_dispr_t *dispr)
             break;
         cdnet_packet_t *pkt = container_of(rx_node, cdnet_packet_t, node);
 
-        if (intf->mac != 255 && !pkt->is_level2) {
+        if (!pkt->is_level2) {
 
             if (pkt->src_port < CDNET_DEF_PORT &&
                     pkt->dst_port >= CDNET_DEF_PORT) {
@@ -80,7 +80,10 @@ void port_dispatcher_task(port_dispr_t *dispr)
                 pkt->dst_port = udp_req->cur++;
                 if (udp_req->cur >= udp_req->end)
                     udp_req->cur = udp_req->begin;
-                list_put(&intf->tx_head, node);
+                if (pkt->src_mac != 255)
+                    list_put(&intf->tx_head, node);
+                else
+                    list_put(intf->free_head, node);
             }
             item = item->next;
         }
@@ -92,7 +95,10 @@ void port_dispatcher_task(port_dispr_t *dispr)
             break;
         cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
         cdnet_exchange_src_dst(intf, pkt);
-        list_put(&intf->tx_head, node);
+        if (pkt->src_mac != 255)
+            list_put(&intf->tx_head, node);
+        else
+            list_put(intf->free_head, node);
     }
 
     cdnet_tx(intf);

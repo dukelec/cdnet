@@ -84,6 +84,7 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
 
     intf->uart = uart;
     intf->t_last = get_systick();
+    intf->rx_crc = 0xffff;
 
 #ifdef USE_DYNAMIC_INIT
     intf->tx_head.first = NULL;
@@ -126,26 +127,29 @@ void cduart_rx_task(cduart_intf_t *intf, uint8_t val)
             get_systick() - intf->t_last > CDUART_IDLE_TIME) {
         d_debug("cduart: drop packet, cnt: %d\n", intf->rx_byte_cnt);
         intf->rx_byte_cnt = 0;
+        intf->rx_crc = 0xffff;
     }
 
     frame->dat[intf->rx_byte_cnt] = val;
+    intf->rx_crc = crc16_byte(val, intf->rx_crc);
 
     if (intf->rx_byte_cnt == 0) {
         if (!match_filter(intf->remote_filter, intf->remote_filter_len, val)) {
             d_verbose("cduart: byte0 filtered, %02x\n", val);
             intf->rx_byte_cnt = 0;
+            intf->rx_crc = 0xffff;
             return;
         }
     } else if (intf->rx_byte_cnt == 1) {
         if (!match_filter(intf->local_filter, intf->local_filter_len, val)) {
             d_verbose("cduart: byte1 filtered, %02x\n", val);
             intf->rx_byte_cnt = 0;
+            intf->rx_crc = 0xffff;
             return;
         }
     } else if (intf->rx_byte_cnt == frame->dat[2] + 4) {
 
-        if (crc16(frame->dat, intf->rx_byte_cnt + 1) != 0) {
-            // set rx_error flag
+        if (intf->rx_crc != 0) {
             d_debug("cduart: crc error\n");
         } else {
             list_node_t *node = list_get(intf->free_head);
@@ -158,6 +162,7 @@ void cduart_rx_task(cduart_intf_t *intf, uint8_t val)
             }
         }
         intf->rx_byte_cnt = 0;
+        intf->rx_crc = 0xffff;
         return;
     }
     intf->rx_byte_cnt++;

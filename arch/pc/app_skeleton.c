@@ -112,7 +112,8 @@ static void dummy_set_filter(cd_intf_t *intf, uint8_t filter)
         if (!node)
             return;
         cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
-        pkt->is_local = true;
+        pkt->is_multi_net = false;
+        pkt->is_multicast = false;
         pkt->dst_mac = 0x55;
         pkt->dst_port = PASSTHRU_CONF_PORT; // set filter
         pkt->dat_len = 1;
@@ -157,8 +158,8 @@ static void net_init(void)
     cdnet_intf_init(&net_proxy_intf, &net_free_head, &cd_proxy_intf, 0x00);
     port_dispatcher_init(&port_setting_dispr, &net_setting_intf);
     port_dispatcher_init(&port_proxy_dispr, &net_proxy_intf);
-    setting_req.begin = CDNET_BASIC_PORT;
-    setting_req.end = CDNET_BASIC_PORT + 1;
+    setting_req.begin = CDNET_DEF_PORT;
+    setting_req.end = CDNET_DEF_PORT + 1;
     setting_req.cur = setting_req.end;
     list_put(&port_setting_dispr.udp_req_head, &setting_req.node);
 

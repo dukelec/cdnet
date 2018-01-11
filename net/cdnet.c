@@ -16,7 +16,7 @@
 void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
         cd_intf_t *cd_intf, uint8_t mac)
 {
-    intf->mac = mac;    // set to 255 if auto alloc IP addr
+    intf->mac = mac; // 255: unspecified
     intf->free_head = free_head;
 
     intf->cd_intf = cd_intf;
@@ -366,7 +366,7 @@ void cdnet_exchange_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     pkt->src_mac = pkt->dst_mac;
     pkt->dst_mac = tmp_mac;
 
-    if (pkt->is_multicast)
+    if (pkt->src_mac == 255)
         pkt->src_mac = intf->mac;
 
     if (pkt->is_multi_net) {
@@ -468,8 +468,10 @@ void cdnet_tx(cdnet_intf_t *intf)
             break;
 
         cd_node = cd_intf->get_free_node(cd_intf);
-        if (!cd_node)
+        if (!cd_node) {
+            d_error("cdnet %p: no free node for tx\n", intf);
             break;
+        }
 
         cd_frame = container_of(cd_node, cd_frame_t, node);
         if (intf->tx_frag_head.first) {

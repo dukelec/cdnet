@@ -26,7 +26,7 @@
 
 typedef struct {
     list_node_t node;
-    uint8_t     dat[256 + 3 + 2]; // "3 + 2" for cdbus through uart
+    uint8_t     dat[260]; // max size for cdbus through uart
 } cd_frame_t;
 
 typedef struct cd_intf {
@@ -53,7 +53,7 @@ typedef struct {
 
     bool        is_level2;
     bool        is_multi_net;
-    bool		is_multicast;
+    bool        is_multicast;
 
     uint8_t     src_mac;
     uint8_t     dst_mac;

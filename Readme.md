@@ -96,7 +96,7 @@ When communication with PC:
 ### PORT_SIZE:
 
 | bit2 | bit1 | bit0   | SRC_PORT      | DST_PORT      |
-|------|------|--------|-------------------------------|
+|------|------|--------|---------------|---------------|
 | 0    | 0    | 0      | default port  | 1 byte        |
 | 0    | 0    | 1      | default port  | 2 bytes       |
 | 0    | 1    | 0      | 1 byte        | default port  |

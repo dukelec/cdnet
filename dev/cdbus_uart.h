@@ -40,6 +40,7 @@ typedef struct cduart_intf {
 
     list_node_t         *rx_node;    // init: != NULL
     uint16_t            rx_byte_cnt;
+    uint16_t            rx_crc;
     uint32_t            t_last;      // last receive time
 
     list_node_t         *tx_node;

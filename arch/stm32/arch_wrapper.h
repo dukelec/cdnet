@@ -129,7 +129,7 @@ typedef struct {
 } spi_t;
 
 static inline int spi_mem_write(spi_t *spi, uint8_t mem_addr,
-        const uint8_t *buf, uint8_t len)
+        const uint8_t *buf, int len)
 {
     int ret = 0;
     gpio_set_value(spi->ns_pin, 0);
@@ -140,7 +140,7 @@ static inline int spi_mem_write(spi_t *spi, uint8_t mem_addr,
 }
 
 static inline int spi_mem_read(spi_t *spi, uint8_t mem_addr,
-        uint8_t *buf, uint8_t len)
+        uint8_t *buf, int len)
 {
     int ret = 0;
     gpio_set_value(spi->ns_pin, 0);
@@ -161,14 +161,14 @@ typedef struct {
 } i2c_t;
 
 static inline int i2c_mem_write(i2c_t *i2c, uint8_t mem_addr,
-        const uint8_t *buf, uint8_t len)
+        const uint8_t *buf, int len)
 {
     return HAL_I2C_Mem_Write(i2c->hi2c, i2c->dev_addr, mem_addr, 1,
             (uint8_t *)buf, len, HAL_MAX_DELAY);
 }
 
 static inline int i2c_mem_read(i2c_t *i2c, uint8_t mem_addr,
-        uint8_t *buf, uint8_t len)
+        uint8_t *buf, int len)
 {
     return HAL_I2C_Mem_Read(i2c->hi2c, i2c->dev_addr, mem_addr, 1,
             buf, len, HAL_MAX_DELAY);
