@@ -5,7 +5,7 @@ CDNET is a high layer protocol for CDBUS
 2. [Level 0 Format](#level-0-format)
 3. [Level 1 Format](#level-1-format)
 4. [Level 2 Format](#level-2-format)
-5. [Port 0](#port-0)
+5. [Specific Ports](#specific-ports)
 6. [Examples](#examples)
 
 
@@ -17,17 +17,14 @@ CDNET protocol has three different levels, select by bit7 and bit6 of first byte
 |------|------- |---------------------------------------------------------------|
 | 0    | x      | Level 0: The simplest one, for single network communication   |
 | 1    | 0      | Level 1: Support cross network and multi-cast communication   |
-| 1    | 1      | Level 2: Raw TCP/IP communication between PCs                 |
+| 1    | 1      | Level 2: Raw, e.g. TCP/IP communication between PCs           |
 
-All devices have to support the Level 0, the Level 1 and Level 2 are optional.
+You can select one or more levels for your application as needed.
+
+The CDNET is little endian.
+
 
 ## Level 0 Format
-First byte:
-
-| FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
-| [7]     | Always 0: Level 0                                 |
-| [6]     | 0: request; 1: reply                              |
 
 ### Request
 First byte:
@@ -71,7 +68,7 @@ First byte:
 | [6]     | Always 0                                          |
 | [5]     | MULTI_NET                                         |
 | [4]     | MULTICAST                                         |
-| [3]     | Reserved                                          |
+| [3]     | SEQ_NO                                            |
 | [2:0]   | PORT_SIZE                                         |
 
 Notes: All fields reserved in this document must be 0.
@@ -82,16 +79,20 @@ Notes: All fields reserved in this document must be 0.
 |-----------|-----------|-----------------------------------------------------------------------------------| 
 | 0         | 0         | Local net: append 0 byte                                                          |
 | 0         | 1         | Local net multicast: append 2 bytes `[multicast-id]`                              |
-| 1         | 0         | Cross net: append 4 bytes: `[src_net, src_id, dst_net, dst_id]`                   |
-| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_id, multicast-id]`            |
+| 1         | 0         | Cross net: append 4 bytes: `[src_net, src_mac, dst_net, dst_mac]`                 |
+| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, multicast-id]`           |
 
 Notes:
- - Address from frame header equal to the `id` in same network.
  - Broadcast could simply not use the MULTICAST bit.
 
 When communication with PC:
- - The `net` is equal to byte 8 of IPv6 Unique Local Address.
- - The `id` is equal to byte 16 of IPv6 Unique Local Address.
+ - The `net` is mapped to byte 8 of IPv6 Unique Local Address.
+ - The `mac` is mapped to byte 16 of IPv6 Unique Local Address.
+
+### SEQ_NO
+0: no sequence number;  
+1: append 1 byte sequence number, see [Port 1](#port-1).
+
 
 ### PORT_SIZE:
 
@@ -107,9 +108,8 @@ When communication with PC:
 | 1    | 1    | 1      | 2 bytes       | 2 bytes       |
 
 Notes:
- - Default port is `0xcdcd` for convention, it does not take up space,
-otherwise append 1 or 2 byte(s) for the src and dst port.
- - CDNET is little endian.
+ - Default port is `0xcdcd` for convention, it does not take up space.
+ - Append bytes for `src_port` first then `dst_port`.
 
 
 ## Level 2 Format
@@ -121,24 +121,162 @@ First byte:
 | [6]     | Always 1                                          |
 | [5]     | FRAGMENT                                          |
 | [4]     | FRAGMENT_END                                      |
-| [3]     | COMPRESSED                                        |
-| [2:0]   | Reserved                                          |
+| [3]     | SEQ_NO                                            |
+| [2]     | COMPRESSED                                        |
+| [1:0]   | Reserved                                          |
 
 ### FRAGMENT
 0: not fragment;  
-1: fragment packet: append 1 byte for `fragment-id`.
+1: fragment packet, must select `SEQ_NO`.
 
 ### FRAGMENT_END:
 0: more fragments follow;  
 1: last fragment.
 
+### SEQ_NO
+0: no sequence number;  
+1: append 1 byte sequence number, see [Port 1](#port-1).
 
-## Port 0
-All device on the bus should provide the port 0 service,
-which handled the common functions ralated to the bus,
-e.g.: provide device info, set bond rate, set device address, software flow control and receive bus error notifications.
 
-Tips: UDP port 0 on the PC can be mapped to other ports, e.g. port `0xcd00` in `cdbus_tun`.
+## Specific Ports
+
+Ports 0 through 9 are cdnet-specific (undefined ports are reserved),
+Port 10 and later are freely assigned by user.
+
+All specific ports are optional,
+and user can only implement some of the port features.
+It is recommended to implement at least the basic part of port0.
+
+### Port 0
+
+Provide device info.
+
+Write `[]` (None) to port 0: check `device_info` string,  
+Return `device_info` string: (any sequence, must contain at least model field)  
+ - conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
+
+Write `filter_string` to port 0: search device by string, (optional)  
+Return `device_info` string if `device_info` contain `filter_string`.
+
+Tips: UDP port 0 on the PC can be mapped to other ports, e.g. port `0xcd00`.
+
+### Port 1
+
+Used together with header's `SEQ_NO` for flow control and ensure data integrity.  
+Bit 7 of `SEQ_NO` is set indicating that an `ACK` is required.  
+The `SEQ_NO[6:0]` auto increase when `SEQ_NO` is selected in the header.  
+Do not select `SEQ_NO` for port 1 communication.
+
+Port 1 communications:
+```
+Write [] (None) to port 1: check the RX free space and the SEQ_NO corresponding to the requester,
+return: [FREE_PKT, CUR_SEQ_NO] (2 bytes), CUR_SEQ_NO bit 7 indicates that there is no record.
+
+Write [0x00, SET_SEQ_NO] to port 1: set the SEQ_NO which corresponding to the requester,
+return: [FREE_PKT, CUR_SEQ_NO].
+
+Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 1 if ACK is required,
+no return.
+
+Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 1 if wrong sequence detected and droped (include no record),
+no return.
+```
+
+Example: (Device A send packets to device B)
+
+Device B maintain a `SEQ_NO` record list for each remote device, when the list is full, drop the oldest record.
+
+Before the first transmission, or the record has been dropped, device A should init the `SEQ_NO` for B:
+```
+Send [0x00, 0x00] from A default port to B port 1,
+Return [FREE_PKT, 0x00] from B port 1 to A default port.
+```
+
+Send multipule packets from A to B:
+```
+[0x88, 0x00, ...] // first byte: level 1 header, second byte: SEQ_NO
+[0x88, 0x01, ...]
+...
+[0x88, 0x0e, ...]
+[0x88, 0x8f, ...] // require ACK
+  
+[0x88, 0x10, ...]
+[0x88, 0x11, ...]
+...
+[0x88, 0x9f, ...] // require ACK
+
+Wait for first ACK before continue send.
+```
+
+Return `ACK` from B to A:
+```
+Send [0x80, FREE_PKT, 0x0f] from B default port to A port 1.
+```
+
+
+### Port 2
+
+Set device bond rate.
+```
+Type of bond_rate is uint32_t, e.g. 115200;
+Type of interface is uint8_t.
+
+Write [0x00, bond_rate]: set current interface to same bond rate, or
+Write [0x00, bond_rate_low, bond_rate_high]: set current interface to multi bond rate,
+return: [] (None). // change bond rate after return
+
+Write [0x08, interface, bond_rate], or
+Write [0x08, interface, bond_rate_low, bond_rate_high]: set bond rate for the interface,
+return: [] (None).
+
+Write [0x08, interface]: check bond rate of the interface,
+return: [bond_rate] or [bond_rate_low, bond_rate_high]
+```
+
+### Port 3
+
+Set device address.
+```
+Type of mac and net is uint8_t;
+Type of intf is uint8_t;
+Type of max_time_ms is uint8_t.
+
+Write [0x00, mac]: change mac address of current interface,
+return: [] (None). // change mac address after return
+
+Write [0x01, net]: change net id of current interface,
+return: [] (None). // change net id after return
+
+Write [0x08, intf, mac]: set mac address for the interface,
+return: [] (None).
+
+Write [0x09, intf, net]: set net id for the interface,
+return: [] (None).
+
+Write [0x08, intf]: check mac address of the interface,
+return: [mac]
+
+Write [0x09, intf]: check net id of the interface,
+return: [net]
+
+For mac address auto allocation:
+
+Write [0x00, select_start, select_end, max_time_ms]:
+  if current mac address in the range [select_start, select_end], then
+    after wait a random time in the range [0, max_time_ms]:
+      (if detect bus busy during wait, re-generate the random time and re-wait after bus idle)
+      return the device_info string
+  else
+    ignore
+
+Write [0x00, select_start, select_end, target_start, target_end]:
+  if current address in the range [select_start, select_end], then
+    update current interface to a random mac address between [target_start, target_end]
+  else
+    ignore
+no return.
+```
+
 
 ## Examples
 
@@ -149,8 +287,6 @@ Request device info:
 
 Reply the device info string: `"M: c1; S: 1234"`,
 expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a, 0x20, 0x31, 0x32, 0x33, 0x34]`.
-
-Note: Conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
 
 The Level 0 Format:
  * Request:
