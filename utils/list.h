@@ -26,7 +26,10 @@ typedef struct {
 list_node_t *list_get(list_head_t *head);
 void list_put(list_head_t *head, list_node_t *node);
 
-void list_pick(list_head_t *head, list_node_t *pre_node, list_node_t *node);
+list_node_t *list_get_last(list_head_t *head);
+void list_put_begin(list_head_t *head, list_node_t *node);
+void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node);
+void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
 int list_len(list_head_t *head);
 
 
