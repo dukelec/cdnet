@@ -45,8 +45,23 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
     list_head_init(&intf->seq_tx_head);
 #endif
 
-    for (i = 0; i < SEQ_REC_MAX; i++)
-        list_put(&intf->seq_free_head, &intf->seq_rec_alloc[i].node);
+    for (i = 0; i < SEQ_REC_MAX; i++) {
+        list_node_t *node = &intf->seq_rec_alloc[i].node;
+        seq_rec_t *rec = container_of(node, seq_rec_t, node);
+        rec->mac = 255;
+        rec->seq_num = 0x80;
+#ifdef USE_DYNAMIC_INIT
+        rec->is_multi_net = false;
+        list_head_init(&rec->pend_head);
+        rec->pend_cnt = 0;
+        rec->send_cnt = 0;
+        rec->p1_req = NULL;
+#endif
+        if (i < SEQ_REC_MAX / 2)
+            list_put(&intf->seq_rx_head, node);
+        else
+            list_put(&intf->seq_tx_head, node);
+    }
 }
 
 
@@ -230,11 +245,9 @@ void cdnet_rx(cdnet_intf_t *intf)
                 rec->seq_num = pkt->dat[1];
                 list_move_begin(&intf->seq_rx_head, pre, cur);
             } else {
-                list_node_t *n = list_get(&intf->seq_free_head);
-                if (!n)
-                    n = list_get_last(&intf->seq_rx_head);
+                list_node_t *n = list_get_last(&intf->seq_rx_head);
                 if (!n) {
-                    d_error("cdnet %p: port1: no free seq node\n", intf);
+                    d_error("cdnet %p: port1: no rx seq node\n", intf);
                     list_put(intf->free_head, net_node);
                     return;
                 }
@@ -288,13 +301,11 @@ void cdnet_rx(cdnet_intf_t *intf)
             if (rec->pend_head.last) {
                 rec->pend_head.last->next = intf->tx_head.first;
                 intf->tx_head.first = rec->pend_head.first;
-                if (!intf->tx_head.last) {
+                if (!intf->tx_head.last)
                     intf->tx_head.last = rec->pend_head.last;
-                }
             }
-            // delete rec
-            list_pick(&intf->seq_tx_head, pre, cur);
-            list_put(&intf->seq_free_head, cur);
+            // de-init rec
+            rec->seq_num = 0x80;
             list_put(intf->free_head, net_node);
             return;
         }
@@ -318,7 +329,7 @@ void cdnet_rx(cdnet_intf_t *intf)
                 cdnet_send_pkt(intf, p);
                 p->send_time = get_systick();
             }
-        } // else do nothing for set return
+        } // else do nothing for the set return
 
         // free p1_req
         list_put(intf->free_head, &rec->p1_req->node);
@@ -408,6 +419,7 @@ void cdnet_tx(cdnet_intf_t *intf)
                 r->p1_req->dat_len = 0;
                 cdnet_send_pkt(intf, p);
                 r->p1_req->send_time = get_systick();
+                r->send_cnt = 0;
             }
         }
     }
@@ -415,16 +427,22 @@ void cdnet_tx(cdnet_intf_t *intf)
     if (!np) // no pkt for tx
         return;
 
-    if (!np_r) { // no corresponding seq_rec
+    // send pkt which not use seq_num
+    if ((np->level == CDNET_L0 || !np->is_seq) &&
+            (!np_r || (!np_r->p1_req && !np_r->pend_head.first))) {
+        cdnet_send_pkt(intf, np);
+        list_get(&intf->tx_head);
+        list_put(intf->free_head, &np->node);
+        return;
+    }
+
+    if (!np_r || (np_r->seq_num & 0x80)) { // no corresponding seq_rec
         if (!intf->free_head->first) {
             d_error("cdnet %p: no free pkt (set seq)\n", intf);
             return;
         }
 
-        list_node_t *n = list_get(&intf->seq_free_head);
-        if (n) {
-            np_r = container_of(n, seq_rec_t, node);
-        } else {
+        if (!np_r) {
             if (empty_r) {
                 list_pick(&intf->seq_tx_head, empty_p, &empty_r->node);
                 np_r = empty_r;
@@ -445,7 +463,7 @@ void cdnet_tx(cdnet_intf_t *intf)
         np_r->seq_num = 0;
         list_head_init(&np_r->pend_head);
         np_r->pend_cnt = 0;
-        np_r->p1_req = NULL;
+        np_r->send_cnt = 0;
 
         // send set, TODO: add multi_net support
         np_r->p1_req = container_of(list_get(intf->free_head),
@@ -464,22 +482,15 @@ void cdnet_tx(cdnet_intf_t *intf)
         return;
     }
 
-    // wait port1 answer
-    if (np_r->p1_req)
-        return;
-
-    // send pkt which not use seq_num
-    if (np->level == CDNET_L0 || !np->is_seq) {
-        cdnet_send_pkt(intf, np);
-        list_get(&intf->tx_head);
-        list_put(intf->free_head, &np->node);
-        return;
-    }
-
     // send pkt which use seq_num
-    if (np_r->pend_cnt > 10)
+    if (np_r->p1_req || np_r->pend_cnt > 10)
         return;
-    np->req_ack = (intf->tx_head.last == &np->node || np_r->pend_cnt == 5);
+    if (++np_r->send_cnt == 5) {
+        np_r->send_cnt = 0;
+        np->req_ack = true;
+    } else {
+        np->req_ack = false;
+    }
     np->seq_num = np_r->seq_num++;
     np_r->seq_num &= 0x7f;
     cdnet_send_pkt(intf, np);

@@ -119,7 +119,7 @@ typedef struct {
     // for tx only
     list_head_t pend_head;
     uint8_t     pend_cnt; // items in pend_head
-    //list_node_t *first_req_node;
+    uint8_t     send_cnt;
     cdnet_packet_t *p1_req;
 } seq_rec_t;
 
@@ -133,7 +133,6 @@ typedef struct {
     list_head_t tx_head;
 
     seq_rec_t   seq_rec_alloc[SEQ_REC_MAX];
-    list_head_t seq_free_head;
     list_head_t seq_rx_head;
     list_head_t seq_tx_head;
 
