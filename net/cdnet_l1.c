@@ -110,9 +110,9 @@ int cdnet_l1_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
     if (dst_port_size == 2)
         *buf++ = pkt->dst_port >> 8;
 
-    assert(buf - buf_s + pkt->dat_len <= 256);
-    *(buf_s + 2) = buf - buf_s + pkt->dat_len - 3;
-    memcpy(buf, pkt->dat, pkt->dat_len);
+    assert(buf - buf_s + pkt->len <= 256);
+    *(buf_s + 2) = buf - buf_s + pkt->len - 3;
+    memcpy(buf, pkt->dat, pkt->len);
     return 0;
 }
 
@@ -133,7 +133,7 @@ int cdnet_l1_from_frame(cdnet_intf_t *intf,
     pkt->dst_mac = *buf++;
     tmp_len = *buf++;
     assert(tmp_len >= 1);
-    pkt->dat_len = 0;
+    pkt->len = 0;
     buf++; // skip hdr
 
     pkt->is_multi_net = false;
@@ -173,8 +173,8 @@ int cdnet_l1_from_frame(cdnet_intf_t *intf,
     if (dst_port_size == 2)
         pkt->dst_port |= *buf++ << 8;
 
-    pkt->dat_len = tmp_len - (buf - buf_s - 3);
-    assert(pkt->dat_len >= 0);
-    memcpy(pkt->dat, buf, pkt->dat_len);
+    pkt->len = tmp_len - (buf - buf_s - 3);
+    assert(pkt->len >= 0);
+    memcpy(pkt->dat, buf, pkt->len);
     return 0;
 }

@@ -13,6 +13,9 @@
 #include "common.h"
 #include "cdnet.h"
 
+#ifndef CDCTL_SYS_CLK
+#define CDCTL_SYS_CLK   40000000UL // 40MHz
+#endif
 
 typedef struct {
     cd_intf_t   cd_intf;

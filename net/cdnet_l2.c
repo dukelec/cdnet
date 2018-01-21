@@ -43,9 +43,9 @@ int cdnet_l2_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
 
     *buf++ = pkt->seq_num | (pkt->req_ack << 7);
 
-    assert(buf - buf_s + pkt->dat_len <= 256);
-    *(buf_s + 2) = buf - buf_s + pkt->dat_len - 3;
-    memcpy(buf, pkt->dat, pkt->dat_len);
+    assert(buf - buf_s + pkt->len <= 256);
+    *(buf_s + 2) = buf - buf_s + pkt->len - 3;
+    memcpy(buf, pkt->dat, pkt->len);
     return 0;
 }
 
@@ -79,8 +79,8 @@ int cdnet_l2_from_frame(cdnet_intf_t *intf,
     pkt->req_ack = !!(pkt->seq_num & 0x80);
     pkt->seq_num &= 0x7f;
 
-    pkt->dat_len = tmp_len - 2;
-    assert(pkt->dat_len >= 0);
-    memcpy(pkt->dat, buf, pkt->dat_len);
+    pkt->len = tmp_len - 2;
+    assert(pkt->len >= 0);
+    memcpy(pkt->dat, buf, pkt->len);
     return 0;
 }

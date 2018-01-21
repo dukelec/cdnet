@@ -67,7 +67,7 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 
 // helper
 
-void cdnet_exchange_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
+void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
     uint8_t tmp_addr[2];
     uint8_t tmp_mac;
@@ -192,7 +192,7 @@ void cdnet_rx(cdnet_intf_t *intf)
 
         // in ack
 
-        if (pkt->dat_len == 3 && pkt->dat[0] == 0x80) {
+        if (pkt->len == 3 && pkt->dat[0] == 0x80) {
             list_for_each(&intf->seq_tx_head, pre, cur) {
                 seq_rec_t *r = container_of(cur, seq_rec_t, node);
                 if (is_rec_match(r, pkt)) {
@@ -228,18 +228,18 @@ void cdnet_rx(cdnet_intf_t *intf)
         }
 
         // in check seq_num
-        if (pkt->dat_len == 0) {
-            pkt->dat_len = 2;
+        if (pkt->len == 0) {
+            pkt->len = 2;
             pkt->dat[0] = 20; // TODO: report FREE_SIZE
             pkt->dat[1] = rec ? rec->seq_num : 0x80;
-            cdnet_exchange_src_dst(intf, pkt);
+            cdnet_exchg_src_dst(intf, pkt);
             cdnet_send_pkt(intf, pkt);
             list_put(intf->free_head, net_node);
             return;
         }
 
         // in set seq_num
-        if (pkt->dat_len == 2 && pkt->dat[0] == 0x00) {
+        if (pkt->len == 2 && pkt->dat[0] == 0x00) {
             if (rec) {
                 d_debug("cdnet %p: port1: set seq_num\n", intf);
                 rec->seq_num = pkt->dat[1];
@@ -264,7 +264,7 @@ void cdnet_rx(cdnet_intf_t *intf)
                 list_put_begin(&intf->seq_rx_head, n);
             }
             pkt->dat[0] = 20; // TODO: report FREE_SIZE
-            cdnet_exchange_src_dst(intf, pkt);
+            cdnet_exchg_src_dst(intf, pkt);
             cdnet_send_pkt(intf, pkt);
             list_put(intf->free_head, net_node);
             return;
@@ -289,7 +289,7 @@ void cdnet_rx(cdnet_intf_t *intf)
             }
         }
 
-        if (!rec || !rec->p1_req || pkt->dat_len != 2) {
+        if (!rec || !rec->p1_req || pkt->len != 2) {
             d_error("cdnet %p: no match rec for p1 answer\n", intf);
             list_put(intf->free_head, net_node);
             return;
@@ -310,7 +310,7 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         }
 
-        if (rec->p1_req->dat_len == 0) { // check return
+        if (rec->p1_req->len == 0) { // check return
             // free, as same as get the ack
             list_for_each(&rec->pend_head, pre, cur) {
                 cdnet_packet_t *p;
@@ -416,7 +416,7 @@ void cdnet_tx(cdnet_intf_t *intf)
                 cdnet_fill_src_addr(intf, r->p1_req);
                 r->p1_req->src_port = CDNET_DEF_PORT;
                 r->p1_req->dst_port = 1;
-                r->p1_req->dat_len = 0;
+                r->p1_req->len = 0;
                 cdnet_send_pkt(intf, p);
                 r->p1_req->send_time = get_systick();
                 r->send_cnt = 0;
@@ -473,7 +473,7 @@ void cdnet_tx(cdnet_intf_t *intf)
         cdnet_fill_src_addr(intf, np_r->p1_req);
         np_r->p1_req->src_port = CDNET_DEF_PORT;
         np_r->p1_req->dst_port = 1;
-        np_r->p1_req->dat_len = 2;
+        np_r->p1_req->len = 2;
         np_r->p1_req->dat[0] = 0x00;
         np_r->p1_req->dat[1] = 0x00;
         cdnet_send_pkt(intf, np_r->p1_req);

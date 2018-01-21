@@ -151,7 +151,7 @@ It is recommended to implement at least the basic part of port0.
 
 Provide device info.
 
-Write `[]` (None) to port 0: check `device_info` string,  
+Write `[]` (empty) to port 0: check `device_info` string,  
 Return `device_info` string: (any sequence, must contain at least model field)  
  - conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
 
@@ -169,7 +169,7 @@ Do not select `SEQ_NO` for port 1 communication.
 
 Port 1 communications:
 ```
-Write [] (None) to port 1: check the RX free space and the SEQ_NO corresponding to the requester,
+Write [] (empty) to port 1: check the RX free space and the SEQ_NO corresponding to the requester,
 return: [FREE_PKT, CUR_SEQ_NO] (2 bytes), CUR_SEQ_NO bit 7 indicates that there is no record.
 
 Write [0x00, SET_SEQ_NO] to port 1: set the SEQ_NO which corresponding to the requester,
@@ -178,7 +178,7 @@ return: [FREE_PKT, CUR_SEQ_NO].
 Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 1 if ACK is required,
 no return.
 
-Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 1 if wrong sequence detected and droped (include no record),
+Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 1 if wrong sequence detected and droped (optional),
 no return.
 ```
 
@@ -216,21 +216,21 @@ Send [0x80, FREE_PKT, 0x0f] from B default port to A port 1.
 
 ### Port 2
 
-Set device bond rate.
+Set device baud rate.
 ```
-Type of bond_rate is uint32_t, e.g. 115200;
+Type of baud_rate is uint32_t, e.g. 115200;
 Type of interface is uint8_t.
 
-Write [0x00, bond_rate]: set current interface to same bond rate, or
-Write [0x00, bond_rate_low, bond_rate_high]: set current interface to multi bond rate,
-return: [] (None). // change bond rate after return
+Write [0x00, baud_rate]: set current interface to same baud rate, or
+Write [0x00, baud_rate_low, baud_rate_high]: set current interface to multi baud rate,
+return: [] (empty) // change baud rate after return
 
-Write [0x08, interface, bond_rate], or
-Write [0x08, interface, bond_rate_low, bond_rate_high]: set bond rate for the interface,
-return: [] (None).
+Write [0x08, interface, baud_rate], or
+Write [0x08, interface, baud_rate_low, baud_rate_high]: set baud rate for the interface,
+return: [] (empty)
 
-Write [0x08, interface]: check bond rate of the interface,
-return: [bond_rate] or [bond_rate_low, bond_rate_high]
+Write [0x08, interface]: check baud rate of the interface,
+return: [baud_rate] or [baud_rate_low, baud_rate_high]
 ```
 
 ### Port 3
@@ -242,16 +242,19 @@ Type of intf is uint8_t;
 Type of max_time_ms is uint8_t.
 
 Write [0x00, mac]: change mac address of current interface,
-return: [] (None). // change mac address after return
+return: [] (empty) // change mac address after return
 
 Write [0x01, net]: change net id of current interface,
-return: [] (None). // change net id after return
+return: [] (empty) // change net id after return
+
+Write [0x01]: check net id of current interface,
+return: [net]
 
 Write [0x08, intf, mac]: set mac address for the interface,
-return: [] (None).
+return: [] (empty)
 
 Write [0x09, intf, net]: set net id for the interface,
-return: [] (None).
+return: [] (empty)
 
 Write [0x08, intf]: check mac address of the interface,
 return: [mac]
@@ -307,6 +310,6 @@ The Level 1 Format:
 
 ### Code Examples
 
-How to use this library refer to `app_skeleton.c` under `arch/*/`;  
+How to use this library refer to `cdnet_bridge` and `cdnet_tun` project;  
 How to control CDCTL-Bx refer to `dev/cdctl_bx.c & .h`.
 

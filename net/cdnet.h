@@ -63,9 +63,9 @@ typedef struct cd_intf {
     void (* put_free_node)(struct cd_intf *cd_intf, list_node_t *node);
     void (* put_tx_node)(struct cd_intf *cd_intf, list_node_t *node);
 
-    // cdbus has two bond rates
-    void  (* set_bond_rate)(struct cd_intf *intf, uint16_t, uint16_t);
-    void  (* get_bond_rate)(struct cd_intf *intf, uint16_t *, uint16_t *);
+    // cdbus has two baud rates
+    void  (* set_baud_rate)(struct cd_intf *intf, uint32_t, uint32_t);
+    void  (* get_baud_rate)(struct cd_intf *intf, uint32_t *, uint32_t *);
 
     // 255 for promiscuous mode
     void    (* set_filter)(struct cd_intf *intf, uint8_t filter);
@@ -103,7 +103,7 @@ typedef struct {
     bool        is_fragment_end;
     bool        is_compressed;
 
-    int         dat_len;
+    int         len;
     uint8_t     dat[252];
 } cdnet_packet_t;
 
@@ -146,7 +146,7 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 
 // helper
 
-void cdnet_exchange_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt);
+void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 
 void cdnet_rx(cdnet_intf_t *intf);

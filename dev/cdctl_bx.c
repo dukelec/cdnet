@@ -138,24 +138,31 @@ static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
     return cdctl_read_reg(cdctl_intf, REG_FILTER);
 }
 
-static void cdctl_set_bond_rate(cd_intf_t *cd_intf,
-        uint16_t low, uint16_t high)
+static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
+        uint32_t low, uint32_t high)
 {
+    uint16_t l, h;
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_L, low & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_H, low >> 8);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_L, high & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_H, high >> 8);
+    l = ((float)CDCTL_SYS_CLK / low) - 1 + 0.5;
+    h = ((float)CDCTL_SYS_CLK / high) - 1 + 0.5;
+    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_L, l & 0xff);
+    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_H, l >> 8);
+    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_L, h & 0xff);
+    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_H, h >> 8);
+    d_debug("cdctl %p: set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
-static void cdctl_get_bond_rate(cd_intf_t *cd_intf,
-        uint16_t *low, uint16_t *high)
+static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
+        uint32_t *low, uint32_t *high)
 {
+    uint16_t l, h;
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    *low = cdctl_read_reg(cdctl_intf, REG_PERIOD_LS_L) |
+    l = cdctl_read_reg(cdctl_intf, REG_PERIOD_LS_L) |
             cdctl_read_reg(cdctl_intf, REG_PERIOD_LS_H) << 8;
-    *high = cdctl_read_reg(cdctl_intf, REG_PERIOD_HS_L) |
+    h = cdctl_read_reg(cdctl_intf, REG_PERIOD_HS_L) |
             cdctl_read_reg(cdctl_intf, REG_PERIOD_HS_H) << 8;
+    *low = ((float)CDCTL_SYS_CLK / (l + 1)) + 0.5;
+    *high = ((float)CDCTL_SYS_CLK / (h + 1)) + 0.5;
 }
 
 static void cdctl_flush(cd_intf_t *cd_intf)
@@ -178,8 +185,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->cd_intf.put_tx_node = cdctl_put_tx_node;
     intf->cd_intf.set_filter = cdctl_set_filter;
     intf->cd_intf.get_filter = cdctl_get_filter;
-    intf->cd_intf.set_bond_rate = cdctl_set_bond_rate;
-    intf->cd_intf.get_bond_rate = cdctl_get_bond_rate;
+    intf->cd_intf.set_baud_rate = cdctl_set_baud_rate;
+    intf->cd_intf.get_baud_rate = cdctl_get_baud_rate;
     intf->cd_intf.flush = cdctl_flush;
 
 #ifdef USE_DYNAMIC_INIT
@@ -226,22 +233,20 @@ void cdctl_task(cdctl_intf_t *intf)
 {
     uint8_t flags = cdctl_read_reg(intf, REG_INT_FLAG);
 
-#ifdef DEBUG
     if (flags & BIT_FLAG_RX_LOST) {
-        d_error("error %p: BIT_FLAG_RX_LOST\n", intf);
+        d_error("cdctl %p: BIT_FLAG_RX_LOST\n", intf);
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_LOST);
     }
     if (flags & BIT_FLAG_RX_ERROR) {
-        d_debug("error %p: BIT_FLAG_RX_ERROR\n", intf);
+        d_warn("cdctl %p: BIT_FLAG_RX_ERROR\n", intf);
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_ERROR);
     }
     if (flags & BIT_FLAG_TX_CD) {
-        d_debug("error %p: BIT_FLAG_TX_CD\n", intf);
+        d_debug("cdctl %p: BIT_FLAG_TX_CD\n", intf);
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_CD);
     }
-#endif
     if (flags & BIT_FLAG_TX_ERROR) {
-        d_error("error %p: BIT_FLAG_TX_ERROR\n", intf);
+        d_error("cdctl %p: BIT_FLAG_TX_ERROR\n", intf);
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_ERROR);
     }
 

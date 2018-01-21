@@ -30,7 +30,7 @@ int cdnet_l0_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
         intf->l0_last_port = pkt->dst_port;
         *buf++ = pkt->dst_port; // hdr
     } else { // out reply
-        if (pkt->dat_len >= 1 && pkt->dat[0] <= 31) {
+        if (pkt->len >= 1 && pkt->dat[0] <= 31) {
             // share first byte
             pkt->dat[0] |= HDR_L0_REPLY | HDR_L0_SHARE;
         } else {
@@ -38,9 +38,9 @@ int cdnet_l0_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
         }
     }
 
-    assert(buf - buf_s + pkt->dat_len <= 256);
-    *(buf_s + 2) = buf - buf_s + pkt->dat_len - 3;
-    memcpy(buf, pkt->dat, pkt->dat_len);
+    assert(buf - buf_s + pkt->len <= 256);
+    *(buf_s + 2) = buf - buf_s + pkt->len - 3;
+    memcpy(buf, pkt->dat, pkt->len);
     return 0;
 }
 
@@ -61,15 +61,15 @@ int cdnet_l0_from_frame(cdnet_intf_t *intf,
     assert(tmp_len >= 1);
     buf++; // skip hdr
 
-    pkt->dat_len = tmp_len - 1;
-    cpy_len = pkt->dat_len;
+    pkt->len = tmp_len - 1;
+    cpy_len = pkt->len;
 
     if (*hdr & HDR_L0_REPLY) { // in reply
         pkt->src_port = intf->l0_last_port;
         pkt->dst_port = CDNET_DEF_PORT;
         if (*hdr & HDR_L0_SHARE) {
-            pkt->dat_len = tmp_len;
-            cpy_len = pkt->dat_len - 1;
+            pkt->len = tmp_len;
+            cpy_len = pkt->len - 1;
             *cpy_to++ = *hdr & 0x1f;
         }
     } else { // in request
@@ -77,7 +77,7 @@ int cdnet_l0_from_frame(cdnet_intf_t *intf,
         pkt->dst_port = *hdr;
     }
 
-    assert(pkt->dat_len >= 0);
+    assert(pkt->len >= 0);
     memcpy(cpy_to, buf, cpy_len);
     return 0;
 }
