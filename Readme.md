@@ -91,7 +91,7 @@ When communication with PC:
 
 ### SEQ_NO
 0: no sequence number;  
-1: append 1 byte sequence number, see [Port 1](#port-1).
+1: append 1 byte sequence number, see [Port 0](#port-0).
 
 
 ### PORT_SIZE:
@@ -135,7 +135,7 @@ First byte:
 
 ### SEQ_NO
 0: no sequence number;  
-1: append 1 byte sequence number, see [Port 1](#port-1).
+1: append 1 byte sequence number, see [Port 0](#port-0).
 
 
 ## Specific Ports
@@ -145,40 +145,27 @@ Port 10 and later are freely assigned by user.
 
 All specific ports are optional,
 and user can only implement some of the port features.
-It is recommended to implement at least the basic part of port0.
+It is recommended to implement at least the basic part of port 1 (device info).
 
 ### Port 0
-
-Provide device info.
-
-Write `[]` (empty) to port 0: check `device_info` string,  
-Return `device_info` string: (any sequence, must contain at least model field)  
- - conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
-
-Write `filter_string` to port 0: search device by string, (optional)  
-Return `device_info` string if `device_info` contain `filter_string`.
-
-Tips: UDP port 0 on the PC can be mapped to other ports, e.g. port `0xcd00`.
-
-### Port 1
 
 Used together with header's `SEQ_NO` for flow control and ensure data integrity.  
 Bit 7 of `SEQ_NO` is set indicating that an `ACK` is required.  
 The `SEQ_NO[6:0]` auto increase when `SEQ_NO` is selected in the header.  
-Do not select `SEQ_NO` for port 1 communication.
+Do not select `SEQ_NO` for port 0 communication.
 
-Port 1 communications:
+Port 0 communications:
 ```
-Write [] (empty) to port 1: check the RX free space and the SEQ_NO corresponding to the requester,
+Write [] (empty) to port 0: check the RX free space and the SEQ_NO corresponding to the requester,
 return: [FREE_PKT, CUR_SEQ_NO] (2 bytes), CUR_SEQ_NO bit 7 indicates that there is no record.
 
-Write [0x00, SET_SEQ_NO] to port 1: set the SEQ_NO which corresponding to the requester,
+Write [0x00, SET_SEQ_NO] to port 0: set the SEQ_NO which corresponding to the requester,
 return: [FREE_PKT, CUR_SEQ_NO].
 
-Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 1 if ACK is required,
+Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 0 if ACK is required,
 no return.
 
-Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 1 if wrong sequence detected and droped (optional),
+Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 0 if wrong sequence detected and droped (optional),
 no return.
 ```
 
@@ -188,8 +175,8 @@ Device B maintain a `SEQ_NO` record list for each remote device, when the list i
 
 Before the first transmission, or the record has been dropped, device A should init the `SEQ_NO` for B:
 ```
-Send [0x00, 0x00] from A default port to B port 1,
-Return [FREE_PKT, 0x00] from B port 1 to A default port.
+Send [0x00, 0x00] from A default port to B port 0,
+Return [FREE_PKT, 0x00] from B port 0 to A default port.
 ```
 
 Send multipule packets from A to B:
@@ -210,8 +197,19 @@ Wait for first ACK before continue send.
 
 Return `ACK` from B to A:
 ```
-Send [0x80, FREE_PKT, 0x0f] from B default port to A port 1.
+Send [0x80, FREE_PKT, 0x0f] from B default port to A port 0.
 ```
+
+### Port 1
+
+Provide device info.
+
+Write `[]` (empty) to port 1: check `device_info` string,  
+Return `device_info` string: (any sequence, must contain at least model field)  
+ - conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
+
+Write `filter_string` to port 1: search device by string, (optional)  
+Return `device_info` string if `device_info` contain `filter_string`.
 
 
 ### Port 2
@@ -293,7 +291,7 @@ expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a
 
 The Level 0 Format:
  * Request:
-   - CDNET packet: `[0x00]` (`dst_port` = `0x00`, no arguments)
+   - CDNET packet: `[0x01]` (`dst_port` = `0x01`, no arguments)
    - CDBUS frame: `[0x0c, 0x0d, 0x01, 0x00, crc_l, crc_h]`
  * Reply:
    - CDNET packet: `[0x40, 0x4d, 0x3a, 0x20 ... 0x34]` (`0x40`: first data byte not shared with the head)
@@ -301,15 +299,15 @@ The Level 0 Format:
 
 The Level 1 Format:
  * Request:
-   - CDNET packet: `[0x80, 0x00]` (`src_port` = default, `dst_port` = `0x00`, no arguments)
-   - CDBUS frame: `[0x0c, 0x0d, 0x02, 0x80, 0x00, crc_l, crc_h]`
+   - CDNET packet: `[0x80, 0x01]` (`src_port` = default, `dst_port` = `0x01`, no arguments)
+   - CDBUS frame: `[0x0c, 0x0d, 0x02, 0x80, 0x01, crc_l, crc_h]`
  * Reply:
-   - CDNET packet: `[0x82, 0x00, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x00`, `dst_port` = default)
-   - CDBUS frame: `[0x0d, 0x0c, 0x10, 0x82, 0x00, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
+   - CDNET packet: `[0x82, 0x01, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x01`, `dst_port` = default)
+   - CDBUS frame: `[0x0d, 0x0c, 0x10, 0x82, 0x01, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
 
 
 ### Code Examples
 
 How to use this library refer to `cdnet_bridge` and `cdnet_tun` project;  
-How to control CDCTL-Bx refer to `dev/cdctl_bx.c & .h`.
+How to control CDCTL-Bx refer to `dev/cdctl_bx_xxx`.
 

@@ -120,7 +120,7 @@ typedef struct {
     list_head_t pend_head;
     uint8_t     pend_cnt; // items in pend_head
     uint8_t     send_cnt;
-    cdnet_packet_t *p1_req;
+    cdnet_packet_t *p0_req;
 } seq_rec_t;
 
 typedef struct {

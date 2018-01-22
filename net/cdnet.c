@@ -55,7 +55,7 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
         list_head_init(&rec->pend_head);
         rec->pend_cnt = 0;
         rec->send_cnt = 0;
-        rec->p1_req = NULL;
+        rec->p0_req = NULL;
 #endif
         if (i < SEQ_REC_MAX / 2)
             list_put(&intf->seq_rx_head, node);
@@ -185,7 +185,7 @@ void cdnet_rx(cdnet_intf_t *intf)
         return;
     }
 
-    if (pkt->level != CDNET_L2 && pkt->dst_port == 1 &&
+    if (pkt->level != CDNET_L2 && pkt->dst_port == 0 &&
             pkt->src_port >= CDNET_DEF_PORT) {
         list_node_t *pre, *cur;
         seq_rec_t *rec = NULL;
@@ -216,7 +216,7 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         }
 
-        // port 1 service
+        // port 0 service
 
         rec = NULL;
         list_for_each(&intf->seq_rx_head, pre, cur) {
@@ -241,13 +241,13 @@ void cdnet_rx(cdnet_intf_t *intf)
         // in set seq_num
         if (pkt->len == 2 && pkt->dat[0] == 0x00) {
             if (rec) {
-                d_debug("cdnet %p: port1: set seq_num\n", intf);
+                d_debug("cdnet %p: p0: set seq_num\n", intf);
                 rec->seq_num = pkt->dat[1];
                 list_move_begin(&intf->seq_rx_head, pre, cur);
             } else {
                 list_node_t *n = list_get_last(&intf->seq_rx_head);
                 if (!n) {
-                    d_error("cdnet %p: port1: no rx seq node\n", intf);
+                    d_error("cdnet %p: p0: no rx seq node\n", intf);
                     list_put(intf->free_head, net_node);
                     return;
                 }
@@ -259,7 +259,7 @@ void cdnet_rx(cdnet_intf_t *intf)
                 } else {
                     r->mac = pkt->src_mac;
                 }
-                d_debug("cdnet %p: port1: add seq_num\n", intf);
+                d_debug("cdnet %p: p0: add seq_num\n", intf);
                 r->seq_num = pkt->dat[1];
                 list_put_begin(&intf->seq_rx_head, n);
             }
@@ -270,13 +270,13 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         }
 
-        d_warn("cdnet %p: unknown p1 input\n", intf);
+        d_warn("cdnet %p: unknown p0 input\n", intf);
         list_put(intf->free_head, net_node);
         return;
     }
 
-    // port 1 return
-    if (pkt->level != CDNET_L2 && pkt->src_port == 1 &&
+    // port 0 return
+    if (pkt->level != CDNET_L2 && pkt->src_port == 0 &&
             pkt->dst_port == CDNET_DEF_PORT) {
         list_node_t *pre, *cur;
         seq_rec_t *rec = NULL;
@@ -289,14 +289,14 @@ void cdnet_rx(cdnet_intf_t *intf)
             }
         }
 
-        if (!rec || !rec->p1_req || pkt->len != 2) {
-            d_error("cdnet %p: no match rec for p1 answer\n", intf);
+        if (!rec || !rec->p0_req || pkt->len != 2) {
+            d_error("cdnet %p: no match rec for p0 answer\n", intf);
             list_put(intf->free_head, net_node);
             return;
         }
 
         if (pkt->dat[1] & 0x80) { // no seq record
-            d_error("cdnet %p: p1 answer no seq record\n", intf);
+            d_error("cdnet %p: p0 answer no seq record\n", intf);
             // move all pending to intf->tx_head
             if (rec->pend_head.last) {
                 rec->pend_head.last->next = intf->tx_head.first;
@@ -310,7 +310,7 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         }
 
-        if (rec->p1_req->len == 0) { // check return
+        if (rec->p0_req->len == 0) { // check return
             // free, as same as get the ack
             list_for_each(&rec->pend_head, pre, cur) {
                 cdnet_packet_t *p;
@@ -331,9 +331,9 @@ void cdnet_rx(cdnet_intf_t *intf)
             }
         } // else do nothing for the set return
 
-        // free p1_req
-        list_put(intf->free_head, &rec->p1_req->node);
-        rec->p1_req = NULL;
+        // free p0_req
+        list_put(intf->free_head, &rec->p0_req->node);
+        rec->p0_req = NULL;
         list_put(intf->free_head, net_node);
         return;
     }
@@ -383,16 +383,16 @@ void cdnet_tx(cdnet_intf_t *intf)
 
         if (np && is_rec_match(r, np))
             np_r = r;
-        if (!r->p1_req && !r->pend_head.first) {
+        if (!r->p0_req && !r->pend_head.first) {
             empty_p = pre;
             empty_r = r;
         }
 
-        if (r->p1_req) {
-            if (get_systick() - r->p1_req->send_time > SEQ_TIMEOUT) {
-                d_warn("cdnet %p: p1 req timeout\n", intf);
-                cdnet_send_pkt(intf, r->p1_req);
-                r->p1_req->send_time = get_systick();
+        if (r->p0_req) {
+            if (get_systick() - r->p0_req->send_time > SEQ_TIMEOUT) {
+                d_warn("cdnet %p: p0 req timeout\n", intf);
+                cdnet_send_pkt(intf, r->p0_req);
+                r->p0_req->send_time = get_systick();
             }
             continue;
         }
@@ -408,17 +408,17 @@ void cdnet_tx(cdnet_intf_t *intf)
                     d_error("cdnet %p: no free pkt\n", intf);
                     continue;
                 }
-                r->p1_req = container_of(n, cdnet_packet_t, node);
+                r->p0_req = container_of(n, cdnet_packet_t, node);
 
                 // TODO: add multi_net support
-                r->p1_req->level = CDNET_L0;
-                r->p1_req->dst_mac = r->mac;
-                cdnet_fill_src_addr(intf, r->p1_req);
-                r->p1_req->src_port = CDNET_DEF_PORT;
-                r->p1_req->dst_port = 1;
-                r->p1_req->len = 0;
+                r->p0_req->level = CDNET_L0;
+                r->p0_req->dst_mac = r->mac;
+                cdnet_fill_src_addr(intf, r->p0_req);
+                r->p0_req->src_port = CDNET_DEF_PORT;
+                r->p0_req->dst_port = 0;
+                r->p0_req->len = 0;
                 cdnet_send_pkt(intf, p);
-                r->p1_req->send_time = get_systick();
+                r->p0_req->send_time = get_systick();
                 r->send_cnt = 0;
             }
         }
@@ -429,7 +429,7 @@ void cdnet_tx(cdnet_intf_t *intf)
 
     // send pkt which not use seq_num
     if ((np->level == CDNET_L0 || !np->is_seq) &&
-            (!np_r || (!np_r->p1_req && !np_r->pend_head.first))) {
+            (!np_r || (!np_r->p0_req && !np_r->pend_head.first))) {
         cdnet_send_pkt(intf, np);
         list_get(&intf->tx_head);
         list_put(intf->free_head, &np->node);
@@ -466,24 +466,24 @@ void cdnet_tx(cdnet_intf_t *intf)
         np_r->send_cnt = 0;
 
         // send set, TODO: add multi_net support
-        np_r->p1_req = container_of(list_get(intf->free_head),
+        np_r->p0_req = container_of(list_get(intf->free_head),
                 cdnet_packet_t, node);
-        np_r->p1_req->level = CDNET_L0;
-        np_r->p1_req->dst_mac = np_r->mac;
-        cdnet_fill_src_addr(intf, np_r->p1_req);
-        np_r->p1_req->src_port = CDNET_DEF_PORT;
-        np_r->p1_req->dst_port = 1;
-        np_r->p1_req->len = 2;
-        np_r->p1_req->dat[0] = 0x00;
-        np_r->p1_req->dat[1] = 0x00;
-        cdnet_send_pkt(intf, np_r->p1_req);
-        np_r->p1_req->send_time = get_systick();
+        np_r->p0_req->level = CDNET_L0;
+        np_r->p0_req->dst_mac = np_r->mac;
+        cdnet_fill_src_addr(intf, np_r->p0_req);
+        np_r->p0_req->src_port = CDNET_DEF_PORT;
+        np_r->p0_req->dst_port = 0;
+        np_r->p0_req->len = 2;
+        np_r->p0_req->dat[0] = 0x00;
+        np_r->p0_req->dat[1] = 0x00;
+        cdnet_send_pkt(intf, np_r->p0_req);
+        np_r->p0_req->send_time = get_systick();
         d_debug("cdnet %p: set seq_num\n", intf);
         return;
     }
 
     // send pkt which use seq_num
-    if (np_r->p1_req || np_r->pend_cnt > 10)
+    if (np_r->p0_req || np_r->pend_cnt > 10)
         return;
     if (++np_r->send_cnt == 5) {
         np_r->send_cnt = 0;
