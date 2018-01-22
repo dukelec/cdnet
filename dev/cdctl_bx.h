@@ -13,10 +13,6 @@
 #include "common.h"
 #include "cdnet.h"
 
-#ifndef CDCTL_SYS_CLK
-#define CDCTL_SYS_CLK   40000000UL // 40MHz
-#endif
-
 typedef struct {
     cd_intf_t   cd_intf;
     list_head_t *free_head;
@@ -36,9 +32,11 @@ typedef struct {
 
 #ifdef CDCTL_I2C
 void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
+        uint8_t filter, uint32_t baud_l, uint32_t baud_h,
         i2c_t *i2c, gpio_t *rst_n);
 #else
 void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
+        uint8_t filter, uint32_t baud_l, uint32_t baud_h,
         spi_t *spi, gpio_t *rst_n);
 #endif
 

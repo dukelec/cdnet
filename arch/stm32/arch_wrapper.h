@@ -65,10 +65,6 @@ static inline void gpio_set_value(gpio_t *gpio, bool value)
     HAL_GPIO_WritePin(gpio->group, gpio->num, value);
 }
 
-static inline void gpio_set_irq(gpio_t *gpio, bool is_enable)
-{
-}
-
 
 // uart wrapper
 
@@ -149,6 +145,24 @@ static inline int spi_mem_read(spi_t *spi, uint8_t mem_addr,
     gpio_set_value(spi->ns_pin, 1);
     return ret;
 }
+
+static inline int spi_dma_write(spi_t *spi, const uint8_t *buf, int len)
+{
+    return HAL_SPI_Transmit_DMA(spi->hspi, (uint8_t *)buf, len);
+}
+
+static inline int spi_dma_read(spi_t *spi, uint8_t *buf, int len)
+{
+    return HAL_SPI_Receive_DMA(spi->hspi, buf, len);
+}
+
+static inline int spi_dma_write_read(spi_t *spi, const uint8_t *wr_buf,
+        uint8_t *rd_buf, int len)
+{
+    return HAL_SPI_TransmitReceive_DMA(spi->hspi,
+            (uint8_t *)wr_buf, rd_buf, len);
+}
+
 #endif
 
 

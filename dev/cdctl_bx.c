@@ -8,54 +8,8 @@
  */
 
 #include "common.h"
-#include "modbus_crc.h"
 #include "cdctl_bx.h"
-
-
-#define REG_VERSION         0x00
-#define REG_SETTING         0x01
-#define REG_IDLE_LEN        0x02
-#define TX_PERMIT_LEN       0x03
-#define REG_FILTER          0x04
-#define REG_PERIOD_LS_L     0x05
-#define REG_PERIOD_LS_H     0x06
-#define REG_PERIOD_HS_L     0x07
-#define REG_PERIOD_HS_H     0x08
-#define REG_INT_FLAG        0x09
-#define REG_INT_MASK        0x0a
-#define REG_RX              0x0b
-#define REG_TX              0x0c
-#define REG_RX_CTRL         0x0d
-#define REG_TX_CTRL         0x0e
-#define REG_RX_ADDR         0x0f
-#define REG_RX_PAGE_FLAG    0x10
-
-
-#define BIT_SETTING_TX_PUSH_PULL    (1 << 0)
-#define BIT_SETTING_TX_INVERT       (1 << 1)
-#define BIT_SETTING_USER_CRC        (1 << 2)
-#define BIT_SETTING_NO_DROP         (1 << 3)
-#define POS_SETTING_TX_EN_DELAY           4
-#define BIT_SETTING_NO_ARBITRATE    (1 << 6)
-
-#define BIT_FLAG_BUS_IDLE           (1 << 0)
-#define BIT_FLAG_RX_PENDING         (1 << 1)
-#define BIT_FLAG_RX_LOST            (1 << 2)
-#define BIT_FLAG_RX_ERROR           (1 << 3)
-#define BIT_FLAG_TX_BUF_CLEAN       (1 << 4)
-#define BIT_FLAG_TX_CD              (1 << 5)
-#define BIT_FLAG_TX_ERROR           (1 << 6)
-
-#define BIT_RX_RST_POINTER          (1 << 0)
-#define BIT_RX_CLR_PENDING          (1 << 1)
-#define BIT_RX_CLR_LOST             (1 << 2)
-#define BIT_RX_CLR_ERROR            (1 << 3)
-#define BIT_RX_RST                  (1 << 4)
-
-#define BIT_TX_RST_POINTER          (1 << 0)
-#define BIT_TX_START                (1 << 1)
-#define BIT_TX_CLR_CD               (1 << 2)
-#define BIT_TX_CLR_ERROR            (1 << 3)
+#include "cdctl_bx_regs.h"
 
 
 static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
@@ -128,7 +82,7 @@ static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
 {
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     cdctl_write_reg(cdctl_intf, REG_FILTER, filter);
-    cdctl_write_reg(cdctl_intf, TX_PERMIT_LEN,
+    cdctl_write_reg(cdctl_intf, REG_TX_WAIT_LEN,
             filter == 255 ? 255 : filter + 1);
 }
 
@@ -145,11 +99,12 @@ static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     l = ((float)CDCTL_SYS_CLK / low) - 1 + 0.5;
     h = ((float)CDCTL_SYS_CLK / high) - 1 + 0.5;
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_L, l & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_LS_H, l >> 8);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_L, h & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_PERIOD_HS_H, h >> 8);
-    d_debug("cdctl %p: set baud rate: %u %u (%u %u)\n", low, high, l, h);
+    cdctl_write_reg(cdctl_intf, REG_DIV_LS_L, l & 0xff);
+    cdctl_write_reg(cdctl_intf, REG_DIV_LS_H, l >> 8);
+    cdctl_write_reg(cdctl_intf, REG_DIV_HS_L, h & 0xff);
+    cdctl_write_reg(cdctl_intf, REG_DIV_HS_H, h >> 8);
+    d_debug("cdctl %p: set baud rate: %u %u (%u %u)\n",
+            cd_intf, low, high, l, h);
 }
 
 static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
@@ -157,10 +112,10 @@ static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
 {
     uint16_t l, h;
     cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    l = cdctl_read_reg(cdctl_intf, REG_PERIOD_LS_L) |
-            cdctl_read_reg(cdctl_intf, REG_PERIOD_LS_H) << 8;
-    h = cdctl_read_reg(cdctl_intf, REG_PERIOD_HS_L) |
-            cdctl_read_reg(cdctl_intf, REG_PERIOD_HS_H) << 8;
+    l = cdctl_read_reg(cdctl_intf, REG_DIV_LS_L) |
+            cdctl_read_reg(cdctl_intf, REG_DIV_LS_H) << 8;
+    h = cdctl_read_reg(cdctl_intf, REG_DIV_HS_L) |
+            cdctl_read_reg(cdctl_intf, REG_DIV_HS_H) << 8;
     *low = ((float)CDCTL_SYS_CLK / (l + 1)) + 0.5;
     *high = ((float)CDCTL_SYS_CLK / (h + 1)) + 0.5;
 }
@@ -172,6 +127,7 @@ static void cdctl_flush(cd_intf_t *cd_intf)
 }
 
 void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
+        uint8_t filter, uint32_t baud_l, uint32_t baud_h,
 #ifdef CDCTL_I2C
         i2c_t *i2c, gpio_t *rst_n)
 #else
@@ -219,7 +175,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     }
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
-    cdctl_set_filter(&intf->cd_intf, 255);
+    cdctl_set_filter(&intf->cd_intf, filter);
+    cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
     cdctl_flush(&intf->cd_intf);
 
     d_debug("cdctl %p: flags: %02x\n", intf,
