@@ -17,7 +17,7 @@ extern uart_t debug_uart;
     #define LINE_LEN 80
 #endif
 #ifndef DBG_LEN
-    #define DBG_LEN 20
+    #define DBG_LEN 60
 #endif
 
 typedef struct {
@@ -40,9 +40,14 @@ void _dprintf(char* format, ...)
     uint32_t flags;
     list_node_t *node;
 
-    local_irq_save(flags);
-    node = list_get(&dbg_free);
-    local_irq_restore(flags);
+    while (true) {
+        local_irq_save(flags);
+        node = list_get(&dbg_free);
+        local_irq_restore(flags);
+        if (node)
+            break;
+        debug_flush();
+    }
     if (node) {
         dbg_node_t *buf = container_of(node, dbg_node_t, node);
         va_list arg;

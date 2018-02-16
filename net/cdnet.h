@@ -16,18 +16,29 @@
 #define CDNET_DEF_PORT      0xcdcd
 #endif
 
-#ifndef SEQ_REC_MAX
-#define SEQ_REC_MAX         3
+#ifndef SEQ_RX_REC_MAX
+#define SEQ_RX_REC_MAX      3
+#endif
+#ifndef SEQ_TX_REC_MAX
+#define SEQ_TX_REC_MAX      3
+#endif
+#ifndef SEQ_TX_ACK_CNT
+#define SEQ_TX_ACK_CNT      5
+#endif
+#ifndef SEQ_TX_PEND_MAX
+#define SEQ_TX_PEND_MAX     10
 #endif
 
 #ifndef SEQ_TIMEOUT
-#define SEQ_TIMEOUT         5 // ms
+#define SEQ_TIMEOUT         (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
 
 
-#define CDNET_L0            0
-#define CDNET_L1            1
-#define CDNET_L2            2
+typedef enum {
+    CDNET_L0 = 0,
+    CDNET_L1,
+    CDNET_L2
+} cdnet_level_t;
 
 #define HDR_L1_L2           (1 << 7)
 #define HDR_L2              (1 << 6)
@@ -76,67 +87,82 @@ typedef struct cd_intf {
 
 
 typedef struct {
-    list_node_t node;
+    list_node_t     node;
 
-    uint8_t     level;
+    cdnet_level_t   level;
 
-    bool        is_seq;
-    uint8_t     seq_num;
-    bool        req_ack;
-    uint32_t    send_time;
+    bool            is_seq;
+    // set by cdnet_tx:
+    bool            req_ack;
+    uint8_t         seq_num;
+    uint32_t        send_time;
 
-    bool        is_multi_net;
-    bool        is_multicast;
+    bool            is_multi_net;
+    bool            is_multicast;
 
-    uint8_t     src_mac;
-    uint8_t     dst_mac;
-    uint8_t     src_addr[2]; // [net, mac]
-    uint8_t     dst_addr[2];
+    uint8_t         src_mac;
+    uint8_t         dst_mac;
+    uint8_t         src_addr[2]; // [net, mac]
+    uint8_t         dst_addr[2];
 
-    uint16_t    multicast_id;
+    uint16_t        multicast_id;
 
-    uint16_t    src_port;
-    uint16_t    dst_port;
+    uint16_t        src_port;
+    uint16_t        dst_port;
 
     // level 2 only
-    bool        is_fragment;
-    bool        is_fragment_end;
-    bool        is_compressed;
+    bool            is_fragment;
+    bool            is_fragment_end;
+    bool            is_compressed;
 
-    int         len;
-    uint8_t     dat[252];
+    int             len;
+    uint8_t         dat[252];
 } cdnet_packet_t;
 
 
 typedef struct {
-    list_node_t node;
-    bool        is_multi_net;
-    uint8_t     net;
-    uint8_t     mac;
+    list_node_t     node;
+    bool            is_multi_net;
+    uint8_t         net;
+    uint8_t         mac;
 
-    uint8_t     seq_num;
-
-    // for tx only
-    list_head_t pend_head;
-    uint8_t     pend_cnt; // items in pend_head
-    uint8_t     send_cnt;
-    cdnet_packet_t *p0_req;
-} seq_rec_t;
+    uint8_t         seq_num;
+} seq_rx_rec_t;
 
 typedef struct {
-    uint8_t     mac;
-    uint8_t     net;
-    uint8_t     l0_last_port;
+    list_node_t     node;
+    bool            is_multi_net;
+    uint8_t         net;
+    uint8_t         mac;
 
-    list_head_t *free_head;
-    list_head_t rx_head;
-    list_head_t tx_head;
+    uint8_t         seq_num;
 
-    seq_rec_t   seq_rec_alloc[SEQ_REC_MAX];
-    list_head_t seq_rx_head;
-    list_head_t seq_tx_head;
+    // for tx only
+    list_head_t     wait_head;
+    list_head_t     pend_head;
+    uint8_t         pend_cnt; // items in pend_head, for SEQ_TX_PEND_MAX
+    uint8_t         send_cnt; // send ack for each SEQ_TX_ACK_CNT
+    cdnet_packet_t  *p0_req;
+    cdnet_packet_t  *p0_ans;
+    cdnet_packet_t  *p0_ack;
+} seq_tx_rec_t;
 
-    cd_intf_t   *cd_intf;
+typedef struct {
+    uint8_t         mac;
+    uint8_t         net;
+    uint8_t         l0_last_port; // don't override before receive the reply
+
+    list_head_t     *free_head;
+    list_head_t     rx_head;
+    list_head_t     tx_head;
+
+    cd_intf_t       *cd_intf;
+
+    seq_rx_rec_t    seq_rx_rec_alloc[SEQ_RX_REC_MAX];
+    seq_tx_rec_t    seq_tx_rec_alloc[SEQ_TX_REC_MAX];
+    list_head_t     seq_rx_head;
+    list_head_t     seq_tx_head;
+    list_head_t     seq_tx_direct_head;
 } cdnet_intf_t;
 
 

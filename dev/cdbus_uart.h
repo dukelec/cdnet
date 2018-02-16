@@ -14,7 +14,7 @@
 #include "cdnet.h"
 
 #ifndef CDUART_IDLE_TIME
-#define CDUART_IDLE_TIME     500
+#define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
 
 #ifdef CDUART_IT

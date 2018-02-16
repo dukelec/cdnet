@@ -7,7 +7,6 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#include "common.h"
 #include "modbus_crc.h"
 #include "cdbus_uart.h"
 
@@ -131,7 +130,7 @@ void cduart_rx_task(cduart_intf_t *intf, uint8_t val)
     }
 
     frame->dat[intf->rx_byte_cnt] = val;
-    intf->rx_crc = crc16_byte(val, intf->rx_crc);
+    crc16_byte(val, &intf->rx_crc);
 
     if (intf->rx_byte_cnt == 0) {
         if (!match_filter(intf->remote_filter, intf->remote_filter_len, val)) {

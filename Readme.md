@@ -160,7 +160,7 @@ Write [] (empty) to port 0: check the RX free space and the SEQ_NO corresponding
 return: [FREE_PKT, CUR_SEQ_NO] (2 bytes), CUR_SEQ_NO bit 7 indicates that there is no record.
 
 Write [0x00, SET_SEQ_NO] to port 0: set the SEQ_NO which corresponding to the requester,
-return: [FREE_PKT, CUR_SEQ_NO].
+return: [] (empty).
 
 Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 0 if ACK is required,
 no return.
@@ -176,7 +176,7 @@ Device B maintain a `SEQ_NO` record list for each remote device, when the list i
 Before the first transmission, or the record has been dropped, device A should init the `SEQ_NO` for B:
 ```
 Send [0x00, 0x00] from A default port to B port 0,
-Return [FREE_PKT, 0x00] from B port 0 to A default port.
+Return [] (empty) from B port 0 to A default port.
 ```
 
 Send multipule packets from A to B:

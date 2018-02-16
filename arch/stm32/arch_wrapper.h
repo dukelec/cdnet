@@ -190,6 +190,10 @@ static inline int i2c_mem_read(i2c_t *i2c, uint8_t mem_addr,
 #endif
 
 
+#ifndef SYSTICK_US_DIV
+#define SYSTICK_US_DIV  1000
+#endif
+
 static inline uint32_t get_systick(void)
 {
     return HAL_GetTick();

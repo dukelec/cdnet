@@ -34,8 +34,10 @@ int uart_transmit(uart_t *uart, const uint8_t *buf, uint16_t len);
 int uart_set_attribs(int fd, int speed);
 void uart_set_mincount(int fd, int mcount);
 
-#define ND_NS_TIMEOUT       500  // ms
-#define ND_NA_TIMEOUT       1000 // ms
+
+#ifndef SYSTICK_US_DIV
+#define SYSTICK_US_DIV  1000
+#endif
 
 #endif
 
