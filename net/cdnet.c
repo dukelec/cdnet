@@ -60,28 +60,53 @@ void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     if (pkt->src_mac == 255)
         pkt->src_mac = intf->mac;
 
-    if (pkt->is_multi_net) {
+    if (pkt->level == CDNET_L1 && pkt->is_multi_net) {
         memcpy(tmp_addr, pkt->src_addr, 2);
         memcpy(pkt->src_addr, pkt->dst_addr, 2);
         memcpy(pkt->dst_addr, tmp_addr, 2);
         if (pkt->is_multicast) {
+            pkt->is_multicast = false;
             pkt->src_addr[0] = intf->net;
             pkt->src_addr[1] = intf->mac;
         }
     }
 
-    tmp_port = pkt->src_port;
-    pkt->src_port = pkt->dst_port;
-    pkt->dst_port = tmp_port;
+    if (pkt->level != CDNET_L2) {
+        tmp_port = pkt->src_port;
+        pkt->src_port = pkt->dst_port;
+        pkt->dst_port = tmp_port;
+    }
 }
 
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
     pkt->src_mac = intf->mac;
 
-    if (pkt->is_multi_net) {
+    if (pkt->level == CDNET_L1 && pkt->is_multi_net) {
         pkt->src_addr[0] = intf->net;
         pkt->src_addr[1] = intf->mac;
+    }
+}
+
+void cdnet_cpy_dst_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt,
+        const cdnet_packet_t *ref, bool is_ret)
+{
+    // don't forget to set pkt->level and pkt->is_seq
+
+    pkt->dst_mac = is_ret ? ref->src_mac : ref->dst_mac;
+
+    pkt->is_multi_net = false;
+    pkt->is_multicast = false;
+
+    if (ref->level == CDNET_L1) {
+        if (ref->is_multi_net) {
+            pkt->is_multi_net = true;
+            memcpy(pkt->dst_addr, is_ret ? ref->src_addr : ref->dst_addr, 2);
+        }
+        if (ref->is_multicast) {
+            pkt->is_multicast = true;
+            pkt->multicast_id = ref->multicast_id;
+        }
     }
 }
 

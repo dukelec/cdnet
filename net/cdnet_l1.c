@@ -164,14 +164,22 @@ int cdnet_l1_from_frame(cdnet_intf_t *intf,
 
     get_port_size(*hdr & 0x07, &src_port_size, &dst_port_size);
 
-    if (src_port_size >= 1)
-        pkt->src_port = *buf++;
-    if (src_port_size == 2)
-        pkt->src_port |= *buf++ << 8;
-    if (dst_port_size >= 1)
-        pkt->dst_port = *buf++;
-    if (dst_port_size == 2)
-        pkt->dst_port |= *buf++ << 8;
+    if (src_port_size == 0) {
+        pkt->src_port = CDNET_DEF_PORT;
+    } else {
+        if (src_port_size >= 1)
+            pkt->src_port = *buf++;
+        if (src_port_size == 2)
+            pkt->src_port |= *buf++ << 8;
+    }
+    if (dst_port_size == 0) {
+        pkt->dst_port = CDNET_DEF_PORT;
+    } else {
+        if (dst_port_size >= 1)
+            pkt->dst_port = *buf++;
+        if (dst_port_size == 2)
+            pkt->dst_port |= *buf++ << 8;
+    }
 
     pkt->len = tmp_len - (buf - buf_s - 3);
     assert(pkt->len >= 0);

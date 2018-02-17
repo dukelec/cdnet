@@ -184,6 +184,8 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 
 void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt);
+void cdnet_cpy_dst_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt,
+        const cdnet_packet_t *ref, bool is_ret);
 
 void cdnet_rx(cdnet_intf_t *intf);
 void cdnet_tx(cdnet_intf_t *intf);
