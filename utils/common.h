@@ -20,8 +20,12 @@
 #include <stddef.h>     // provide offsetof, NULL
 #include <stdint.h>
 
-#include "list.h"
+#if __has_include("cdnet_config.h")
+#include "cdnet_config.h"
+#endif
+
 #include "arch_wrapper.h"
+#include "list.h"
 
 //#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 //#define NULL 0

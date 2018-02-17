@@ -99,4 +99,3 @@ int list_len(list_head_t *head)
     }
     return ret_val;
 }
-

@@ -177,7 +177,7 @@ static void cdnet_p0_service(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     }
 
     d_warn("cdnet %p: unknown p0 input\n", intf);
-    list_put(intf->free_head, &pkt->node);
+    cdnet_list_put(intf->free_head, &pkt->node);
 }
 
 
@@ -200,7 +200,7 @@ void cdnet_p0_request_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 
         if (!rec || rec->p0_req || rec->p0_ack) {
             d_error("cdnet %p: no match rec for p0 ack\n", intf);
-            list_put(intf->free_head, &pkt->node);
+            cdnet_list_put(intf->free_head, &pkt->node);
             return;
         }
 
@@ -227,7 +227,7 @@ void cdnet_p0_reply_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 
     if (!rec || !rec->p0_req || rec->p0_ans || pkt->len != 2) {
         d_error("cdnet %p: no match rec for p0 answer\n", intf);
-        list_put(intf->free_head, &pkt->node);
+        cdnet_list_put(intf->free_head, &pkt->node);
         return;
     }
 
@@ -249,11 +249,11 @@ void cdnet_seq_rx_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 
     if (!rec || rec->seq_num != pkt->seq_num) {
         d_error("cdnet %p: wrong seq_num, drop\n", intf);
-        list_put(intf->free_head, &pkt->node);
+        cdnet_list_put(intf->free_head, &pkt->node);
     } else {
         rec->seq_num = (rec->seq_num + 1) & 0x7f;
         list_move_begin(&intf->seq_rx_head, pre, cur);
-        list_put(&intf->rx_head, &pkt->node);
+        cdnet_list_put(&intf->rx_head, &pkt->node);
     }
 }
 
@@ -263,7 +263,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
 
     // distribute all items from intf->tx_head to each tx_rec
     while (true) {
-        list_node_t *node = list_get(&intf->tx_head);
+        list_node_t *node = cdnet_list_get(&intf->tx_head);
         if (!node)
             break;
         cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
@@ -293,7 +293,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         seq_tx_rec_t *r = container_of(intf->seq_tx_head.last, seq_tx_rec_t, node);
         if (is_tx_rec_inuse(r)) {
             d_warn("cdnet %p: no free tx_rec\n", intf);
-            list_put_begin(&intf->tx_head, node);
+            cdnet_list_put_begin(&intf->tx_head, node);
             break;
         }
         list_put_begin(&intf->seq_tx_head, list_get_last(&intf->seq_tx_head));
@@ -318,7 +318,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         if (cdnet_send_pkt(intf, pkt) < 0)
             break;
         list_get(&intf->seq_tx_direct_head);
-        list_put(intf->free_head, cur);
+        cdnet_list_put(intf->free_head, cur);
         cur = pre;
     }
 
@@ -326,11 +326,11 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         list_node_t *p, *c;
         seq_tx_rec_t *r = container_of(cur, seq_tx_rec_t, node);
         if (r->p0_req && r->p0_ack) {
-            list_put(intf->free_head, &r->p0_ack->node);
+            cdnet_list_put(intf->free_head, &r->p0_ack->node);
             r->p0_ack = NULL;
         }
         if (!r->p0_req && r->p0_ans) {
-            list_put(intf->free_head, &r->p0_ans->node);
+            cdnet_list_put(intf->free_head, &r->p0_ans->node);
             r->p0_ans = NULL;
         }
         if (r->p0_req && r->p0_ans) {
@@ -343,7 +343,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                     if (r->p0_ans->len == 2 && pkt->seq_num == r->p0_ans->dat[1])
                         break;
                     list_get(&r->pend_head);
-                    list_put(intf->free_head, c);
+                    cdnet_list_put(intf->free_head, c);
                     r->pend_cnt--;
                     c = p;
                 }
@@ -360,15 +360,15 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                     d_error("cdnet %p: set return: pend not empty\n", intf);
                     list_for_each(&r->pend_head, p, c) {
                         list_get(&r->pend_head);
-                        list_put(intf->free_head, c);
+                        cdnet_list_put(intf->free_head, c);
                         c = p;
                     }
                     r->pend_cnt = 0;
                 }
             }
 
-            list_put(intf->free_head, &r->p0_req->node);
-            list_put(intf->free_head, &r->p0_ans->node);
+            cdnet_list_put(intf->free_head, &r->p0_req->node);
+            cdnet_list_put(intf->free_head, &r->p0_ans->node);
             r->p0_req = NULL;
             r->p0_ans = NULL;
         }
@@ -378,11 +378,11 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                 if (pkt->seq_num == r->p0_ack->dat[1])
                     break;
                 list_get(&r->pend_head);
-                list_put(intf->free_head, c);
+                cdnet_list_put(intf->free_head, c);
                 r->pend_cnt--;
                 c = p;
             }
-            list_put(intf->free_head, &r->p0_ack->node);
+            cdnet_list_put(intf->free_head, &r->p0_ack->node);
             r->p0_ack = NULL;
         }
 
@@ -396,7 +396,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         }
 
         if (r->seq_num & 0x80) {
-            list_node_t *node = list_get(intf->free_head);
+            list_node_t *node = cdnet_list_get(intf->free_head);
             if (!node) {
                 d_error("cdnet %p: no free pkt (set seq)\n", intf);
                 continue;
@@ -425,7 +425,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
             if (get_systick() - pkt->send_time > SEQ_TIMEOUT) {
                 d_warn("cdnet %p: pending timeout\n", intf);
                 // send check
-                list_node_t *node = list_get(intf->free_head);
+                list_node_t *node = cdnet_list_get(intf->free_head);
                 if (!node) {
                     d_error("cdnet %p: no free pkt\n", intf);
                     continue;
@@ -473,7 +473,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
             } else {
                 if (ret != 0)
                     d_error("cdnet %p: send wait_head error\n", intf);
-                list_put(intf->free_head, c);
+                cdnet_list_put(intf->free_head, c);
             }
             c = p;
         }

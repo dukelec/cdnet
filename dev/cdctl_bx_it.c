@@ -16,7 +16,7 @@
             BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
 
 
-// only used by init
+// used by init and user configuration
 static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
 {
     uint8_t dat = 0xff;
@@ -24,8 +24,12 @@ static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
     while (intf->state != CDCTL_IDLE);
     spi_mem_read(intf->spi, reg, &dat, 1);
     intf->manual_ctrl = false;
-    if (!gpio_get_value(intf->int_n))
+    if (!gpio_get_value(intf->int_n)) {
+        uint32_t flags;
+        local_irq_save(flags);
         cdctl_int_isr(intf);
+        local_irq_restore(flags);
+    }
     return dat;
 }
 static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
@@ -34,8 +38,12 @@ static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
     while (intf->state != CDCTL_IDLE);
     spi_mem_write(intf->spi, reg | 0x80, &val, 1);
     intf->manual_ctrl = false;
-    if (!gpio_get_value(intf->int_n))
+    if (!gpio_get_value(intf->int_n)) {
+        uint32_t flags;
+        local_irq_save(flags);
         cdctl_int_isr(intf);
+        local_irq_restore(flags);
+    }
 }
 
 
@@ -43,33 +51,20 @@ static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
 
 list_node_t *cdctl_get_free_node(cd_intf_t *cd_intf)
 {
-    uint32_t flags;
-    list_node_t *node;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    local_irq_save(flags);
-    node = list_get(intf->free_head);
-    local_irq_restore(flags);
-    return node;
+    return list_get_irq_safe(intf->free_head);
 }
 
 list_node_t *cdctl_get_rx_node(cd_intf_t *cd_intf)
 {
-    uint32_t flags;
-    list_node_t *node;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    local_irq_save(flags);
-    node = list_get(&intf->rx_head);
-    local_irq_restore(flags);
-    return node;
+    return list_get_irq_safe(&intf->rx_head);
 }
 
 void cdctl_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
 {
-    uint32_t flags;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    local_irq_save(flags);
-    list_put(intf->free_head, node);
-    local_irq_restore(flags);
+    list_put_irq_safe(intf->free_head, node);
 }
 
 void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
@@ -229,8 +224,6 @@ void cdctl_int_isr(cdctl_intf_t *intf)
 // dma finish callback
 void cdctl_spi_isr(cdctl_intf_t *intf)
 {
-    uint32_t flags;
-
     // end of CDCTL_RD_FLAG
     if (intf->state == CDCTL_RD_FLAG) {
         uint8_t val = intf->buf[1];
@@ -338,13 +331,9 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     // end of CDCTL_RX_BODY
     if (intf->state == CDCTL_RX_BODY) {
         gpio_set_value(intf->spi->ns_pin, 1);
-        local_irq_save(flags);
-        list_node_t *node = list_get(intf->free_head);
-        local_irq_restore(flags);
+        list_node_t *node = list_get_irq_safe(intf->free_head);
         if (node) {
-            local_irq_save(flags);
-            list_put(&intf->rx_head, &intf->rx_frame->node);
-            local_irq_restore(flags);
+            list_put_irq_safe(&intf->rx_head, &intf->rx_frame->node);
             intf->rx_frame = container_of(node, cd_frame_t, node);
         } else {
             intf->rx_no_free_node_cnt++;
@@ -366,10 +355,8 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     if (intf->state == CDCTL_TX_BODY) {
         gpio_set_value(intf->spi->ns_pin, 1);
 
-        local_irq_save(flags);
-        list_node_t *node = list_get(&intf->tx_head);
-        list_put(intf->free_head, node);
-        local_irq_restore(flags);
+        list_node_t *node = list_get_irq_safe(&intf->tx_head);
+        list_put_irq_safe(intf->free_head, node);
         intf->tx_wait_trigger = true;
 
         intf->state = CDCTL_RD_FLAG;

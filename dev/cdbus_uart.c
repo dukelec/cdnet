@@ -10,62 +10,38 @@
 #include "modbus_crc.h"
 #include "cdbus_uart.h"
 
-#ifdef CDUART_IT
-#define cduart_irq_save(flags)    local_irq_save(flags)
-#define cduart_irq_restore(flags) local_irq_restore(flags)
+#ifdef CDUART_IRQ_SAFE
+#define cduart_list_get     list_get_irq_safe
+#define cduart_list_put     list_put_irq_safe
 #else
-#define cduart_irq_save(flags)    do {} while (0)
-#define cduart_irq_restore(flags) do {} while (0)
+#define cduart_list_get     list_get
+#define cduart_list_put     list_put
 #endif
 
 // member functions
 
 static list_node_t *cduart_get_free_node(cd_intf_t *cd_intf)
 {
-#ifdef CDUART_IT
-    uint32_t flags;
-#endif
-    list_node_t *node;
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_irq_save(flags);
-    node = list_get(intf->free_head);
-    cduart_irq_restore(flags);
-    return node;
+    return cduart_list_get(intf->free_head);
 }
 
 static list_node_t *cduart_get_rx_node(cd_intf_t *cd_intf)
 {
-#ifdef CDUART_IT
-    uint32_t flags;
-#endif
-    list_node_t *node;
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_irq_save(flags);
-    node = list_get(&intf->rx_head);
-    cduart_irq_restore(flags);
-    return node;
+    return cduart_list_get(&intf->rx_head);
 }
 
 static void cduart_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
 {
-#ifdef CDUART_IT
-    uint32_t flags;
-#endif
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_irq_save(flags);
-    list_put(intf->free_head, node);
-    cduart_irq_restore(flags);
+    cduart_list_put(intf->free_head, node);
 }
 
 static void cduart_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
 {
-#ifdef CDUART_IT
-    uint32_t flags;
-#endif
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_irq_save(flags);
-    list_put(&intf->tx_head, node);
-    cduart_irq_restore(flags);
+    cduart_list_put(&intf->tx_head, node);
 }
 
 

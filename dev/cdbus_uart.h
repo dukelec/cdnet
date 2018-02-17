@@ -23,9 +23,7 @@
 #endif
 
 #if defined(CDUART_TX_IT) || defined(CDUART_RX_IT)
-#ifndef CDUART_IT
-#define CDUART_IT
-#endif
+#define CDUART_IRQ_SAFE
 #endif
 
 

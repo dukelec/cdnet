@@ -37,13 +37,10 @@ static list_head_t dbg_tx = {0};
 
 void _dprintf(char* format, ...)
 {
-    uint32_t flags;
     list_node_t *node;
 
     while (true) {
-        local_irq_save(flags);
-        node = list_get(&dbg_free);
-        local_irq_restore(flags);
+        node = list_get_irq_safe(&dbg_free);
         if (node)
             break;
         debug_flush();
@@ -55,27 +52,20 @@ void _dprintf(char* format, ...)
         // WARN: stack may not enough for reentrant
         buf->len = vsnprintf((char *)buf->data, LINE_LEN, format, arg);
         va_end (arg);
-        local_irq_save(flags);
-        list_put(&dbg_tx, node);
-        local_irq_restore(flags);
+        list_put_irq_safe(&dbg_tx, node);
     }
 }
 
 void dputs(char *str)
 {
-    uint32_t flags;
     list_node_t *node;
 
-    local_irq_save(flags);
-    node = list_get(&dbg_free);
-    local_irq_restore(flags);
+    node = list_get_irq_safe(&dbg_free);
     if (node) {
         dbg_node_t *buf = container_of(node, dbg_node_t, node);
         buf->len = strlen(str);
         memcpy(buf->data, str, buf->len);
-        local_irq_save(flags);
-        list_put(&dbg_tx, node);
-        local_irq_restore(flags);
+        list_put_irq_safe(&dbg_tx, node);
     }
 }
 
@@ -102,18 +92,13 @@ void debug_init(void)
 
 void debug_flush(void)
 {
-    uint32_t flags;
     while (true) {
-        local_irq_save(flags);
-        list_node_t *node = list_get(&dbg_tx);
-        local_irq_restore(flags);
+        list_node_t *node = list_get_irq_safe(&dbg_tx);
         if (!node)
             break;
         dbg_node_t *buf = container_of(node, dbg_node_t, node);
         uart_transmit(&debug_uart, buf->data, buf->len);
-        local_irq_save(flags);
-        list_put(&dbg_free, node);
-        local_irq_restore(flags);
+        list_put_irq_safe(&dbg_free, node);
     }
 }
 

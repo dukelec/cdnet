@@ -33,6 +33,16 @@
 #define SEQ_TIMEOUT         (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
 
+#ifdef CDNET_IRQ_SAFE
+#define cdnet_list_get          list_get_irq_safe
+#define cdnet_list_put          list_put_irq_safe
+#define cdnet_list_put_begin    list_put_begin_irq_safe
+#else
+#define cdnet_list_get          list_get
+#define cdnet_list_put          list_put
+#define cdnet_list_put_begin    list_put_begin
+#endif
+
 
 typedef enum {
     CDNET_L0 = 0,

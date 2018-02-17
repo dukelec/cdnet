@@ -43,5 +43,32 @@ static inline void list_head_init(list_head_t *head)
     head->last = NULL;
 }
 
-#endif
 
+static inline list_node_t *list_get_irq_safe(list_head_t *head)
+{
+    uint32_t flags;
+    list_node_t *node;
+    local_irq_save(flags);
+    node = list_get(head);
+    local_irq_restore(flags);
+    return node;
+}
+
+static inline void list_put_irq_safe(list_head_t *head, list_node_t *node)
+{
+    uint32_t flags;
+    local_irq_save(flags);
+    list_put(head, node);
+    local_irq_restore(flags);
+}
+
+static inline
+void list_put_begin_irq_safe(list_head_t *head, list_node_t *node)
+{
+    uint32_t flags;
+    local_irq_save(flags);
+    list_put_begin(head, node);
+    local_irq_restore(flags);
+}
+
+#endif

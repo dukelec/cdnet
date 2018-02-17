@@ -105,7 +105,7 @@ void cdnet_rx(cdnet_intf_t *intf)
         return;
     frame = container_of(cd_node, cd_frame_t, node);
 
-    net_node = list_get(intf->free_head);
+    net_node = cdnet_list_get(intf->free_head);
     pkt = container_of(net_node, cdnet_packet_t, node);
 
     if ((frame->dat[3] & 0xc0) == 0xc0)
@@ -119,7 +119,7 @@ void cdnet_rx(cdnet_intf_t *intf)
 
     if (ret_val != 0) {
         d_error("cdnet %p: cdnet_from_frame failed\n", intf);
-        list_put(intf->free_head, net_node);
+        cdnet_list_put(intf->free_head, net_node);
         return;
     }
 
@@ -139,7 +139,7 @@ void cdnet_rx(cdnet_intf_t *intf)
     }
 
     // send left pkt to upper layer directly
-    list_put(&intf->rx_head, net_node);
+    cdnet_list_put(&intf->rx_head, net_node);
 }
 
 void cdnet_tx(cdnet_intf_t *intf)
