@@ -323,9 +323,11 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     if (intf->state == CDCTL_RX_HEADER) {
         memcpy(intf->rx_frame->dat, intf->buf + 1, 3);
         intf->state = CDCTL_RX_BODY;
-        spi_dma_read(intf->spi, intf->rx_frame->dat + 3,
-                intf->rx_frame->dat[2]);
-        return;
+        if (intf->rx_frame->dat[2] != 0) {
+            spi_dma_read(intf->spi, intf->rx_frame->dat + 3,
+                    intf->rx_frame->dat[2]);
+            return;
+        } // else goto next if block directly
     }
 
     // end of CDCTL_RX_BODY
@@ -347,8 +349,10 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     if (intf->state == CDCTL_TX_HEADER) {
         cd_frame_t *frame = container_of(intf->tx_head.first, cd_frame_t, node);
         intf->state = CDCTL_TX_BODY;
-        spi_dma_write(intf->spi, frame->dat + 3, frame->dat[2]);
-        return;
+        if (frame->dat[2] != 0) {
+            spi_dma_write(intf->spi, frame->dat + 3, frame->dat[2]);
+            return;
+        } // else goto next if block directly
     }
 
     // end of CDCTL_TX_BODY
