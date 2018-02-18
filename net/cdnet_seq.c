@@ -305,6 +305,8 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         cdnet_packet_t *pkt = container_of(node, cdnet_packet_t, node);
         if (pkt->level == CDNET_L0)
             pkt->is_seq = false;
+        if (pkt->is_seq && pkt->dst_mac == 255)
+            pkt->is_seq = false; // not support seq_no for multicast yet
 
         list_for_each(&intf->seq_tx_head, pre, cur) {
             seq_tx_rec_t *r = container_of(cur, seq_tx_rec_t, node);

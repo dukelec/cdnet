@@ -23,10 +23,10 @@
 #define SEQ_TX_REC_MAX      3
 #endif
 #ifndef SEQ_TX_ACK_CNT
-#define SEQ_TX_ACK_CNT      5
+#define SEQ_TX_ACK_CNT      3
 #endif
 #ifndef SEQ_TX_PEND_MAX
-#define SEQ_TX_PEND_MAX     10
+#define SEQ_TX_PEND_MAX     6
 #endif
 
 #ifndef SEQ_TIMEOUT

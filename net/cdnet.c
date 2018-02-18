@@ -147,6 +147,11 @@ void cdnet_rx(cdnet_intf_t *intf)
         cdnet_list_put(intf->free_head, net_node);
         return;
     }
+    if (pkt->is_multicast) {
+        d_error("cdnet %p: not support multicast yet\n", intf);
+        cdnet_list_put(intf->free_head, net_node);
+        return;
+    }
 
     if (pkt->level != CDNET_L2 && pkt->dst_port == 0 &&
             pkt->src_port >= CDNET_DEF_PORT) {
