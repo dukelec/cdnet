@@ -37,7 +37,7 @@
 #define cdnet_list_get          list_get_irq_safe
 #define cdnet_list_put          list_put_irq_safe
 #define cdnet_list_put_begin    list_put_begin_irq_safe
-#else
+#elif !defined(CDNET_USER_LIST)
 #define cdnet_list_get          list_get
 #define cdnet_list_put          list_put
 #define cdnet_list_put_begin    list_put_begin

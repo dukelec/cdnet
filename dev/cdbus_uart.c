@@ -7,13 +7,12 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#include "modbus_crc.h"
 #include "cdbus_uart.h"
 
 #ifdef CDUART_IRQ_SAFE
 #define cduart_list_get     list_get_irq_safe
 #define cduart_list_put     list_put_irq_safe
-#else
+#elif !defined(CDUART_USER_LIST)
 #define cduart_list_get     list_get
 #define cduart_list_put     list_put
 #endif
@@ -45,8 +44,7 @@ static void cduart_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
 }
 
 
-void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
-    uart_t *uart)
+void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head)
 {
     intf->free_head = free_head;
 
@@ -57,21 +55,16 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
 
     intf->rx_node = list_get(free_head);
 
-    intf->uart = uart;
     intf->t_last = get_systick();
     intf->rx_crc = 0xffff;
 
 #ifdef USE_DYNAMIC_INIT
-    intf->tx_head.first = NULL;
-    intf->tx_head.last = NULL;
-    intf->rx_head.first = NULL;
-    intf->rx_head.last = NULL;
-
-    intf->tx_node = NULL;
+    list_head_init(&intf->rx_head);
+    list_head_init(&intf->tx_head);
     intf->rx_byte_cnt = 0;
 
-    // filters should set by caller
     intf->cd_intf.set_filter = NULL;
+    // filters should set by caller
     intf->remote_filter_len = 0;
     intf->local_filter_len = 0;
 #endif
@@ -79,13 +72,27 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
 
 // handler
 
-static bool match_filter(uint8_t *filter, uint8_t filter_len, uint8_t val)
+static bool rx_match_filter(cduart_intf_t *intf,
+        cd_frame_t *frame, bool test_remote)
 {
     uint8_t i;
+    uint8_t *filter;
+    uint8_t filter_len;
+    uint8_t val;
     bool is_match = false;
 
+    if (test_remote) {
+        filter = intf->remote_filter;
+        filter_len = intf->remote_filter_len;
+        val = frame->dat[0];
+    } else {
+        filter = intf->local_filter;
+        filter_len = intf->local_filter_len;
+        val = frame->dat[1];
+    }
+
     for (i = 0; i < filter_len; i++) {
-        if (val == filter[i]) {
+        if (val == *(filter + i)) {
             is_match = true;
             break;
         }
@@ -93,93 +100,69 @@ static bool match_filter(uint8_t *filter, uint8_t filter_len, uint8_t val)
     return is_match;
 }
 
-void cduart_rx_task(cduart_intf_t *intf, uint8_t val)
+void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 {
-    cd_frame_t *frame = container_of(intf->rx_node, cd_frame_t, node);
-    //d_verbose("cduart: rx cnt: %d, val: %02x\n", intf->rx_byte_cnt, val);
-
-    if (intf->rx_byte_cnt != 0 &&
-            get_systick() - intf->t_last > CDUART_IDLE_TIME) {
-        d_debug("cduart: drop packet, cnt: %d\n", intf->rx_byte_cnt);
-        intf->rx_byte_cnt = 0;
-        intf->rx_crc = 0xffff;
-    }
-
-    frame->dat[intf->rx_byte_cnt] = val;
-    crc16_byte(val, &intf->rx_crc);
-
-    if (intf->rx_byte_cnt == 0) {
-        if (!match_filter(intf->remote_filter, intf->remote_filter_len, val)) {
-            d_verbose("cduart: byte0 filtered, %02x\n", val);
-            intf->rx_byte_cnt = 0;
-            intf->rx_crc = 0xffff;
-            return;
-        }
-    } else if (intf->rx_byte_cnt == 1) {
-        if (!match_filter(intf->local_filter, intf->local_filter_len, val)) {
-            d_verbose("cduart: byte1 filtered, %02x\n", val);
-            intf->rx_byte_cnt = 0;
-            intf->rx_crc = 0xffff;
-            return;
-        }
-    } else if (intf->rx_byte_cnt == frame->dat[2] + 4) {
-
-        if (intf->rx_crc != 0) {
-            d_debug("cduart: crc error\n");
-        } else {
-            list_node_t *node = list_get(intf->free_head);
-            if (node != NULL) {
-                list_put(&intf->rx_head, intf->rx_node);
-                intf->rx_node = node;
-            } else {
-                // set rx_lost flag
-                d_debug("cduart: rx_lost\n");
-            }
-        }
-        intf->rx_byte_cnt = 0;
-        intf->rx_crc = 0xffff;
-        return;
-    }
-    intf->rx_byte_cnt++;
-    intf->t_last = get_systick();
-}
-
-void cduart_tx_task(cduart_intf_t *intf)
-{
-#ifdef CDUART_TX_IT
-    if (!uart_transmit_is_ready(intf->uart))
-        return;
-#endif
-
-    list_node_t *node = list_get(&intf->tx_head);
-    if (!node)
-        return;
-    cd_frame_t *frame = container_of(node, cd_frame_t, node);
-
-    uint16_t crc_val = crc16(frame->dat, frame->dat[2] + 3);
-    frame->dat[frame->dat[2] + 3] = crc_val & 0xff;
-    frame->dat[frame->dat[2] + 4] = crc_val >> 8;
-
-#ifdef CDUART_TX_IT
-    uart_transmit_it(intf->uart, frame->dat, frame->dat[2] + 5);
-#else
-    uart_transmit(intf->uart, frame->dat, frame->dat[2] + 5);
-#endif
-    list_put(intf->free_head, node);
-}
-
-void cduart_task(cduart_intf_t *intf)
-{
-    uint8_t dat;
-    int ret;
+    int i;
+    int max_len;
+    int cpy_len;
+    const uint8_t *rd = buf;
 
     while (true) {
-        ret = uart_receive(intf->uart, &dat, 1);
-        if (ret != 0)
-            break;
-        cduart_rx_task(intf, dat);
+        cd_frame_t *frame = container_of(intf->rx_node, cd_frame_t, node);
+
+        if (!len || rd == buf + len)
+            return;
+        max_len = buf + len - rd;
+
+        if (intf->rx_byte_cnt != 0 &&
+                get_systick() - intf->t_last > CDUART_IDLE_TIME) {
+            d_debug("cduart: drop packet, cnt: %d\n", intf->rx_byte_cnt);
+            intf->rx_byte_cnt = 0;
+            intf->rx_crc = 0xffff;
+        }
+        intf->t_last = get_systick();
+
+        if (intf->rx_byte_cnt < 3)
+            cpy_len = min(3 - intf->rx_byte_cnt, max_len);
+        else
+            cpy_len = min(frame->dat[2] + 5 - intf->rx_byte_cnt, max_len);
+
+        memcpy(frame->dat + intf->rx_byte_cnt, rd, cpy_len);
+        intf->rx_byte_cnt += cpy_len;
+
+        if (intf->rx_byte_cnt <= 3 &&
+                ((intf->rx_byte_cnt >= 2 &&
+                        !rx_match_filter(intf, frame, false)) ||
+                        (intf->rx_byte_cnt >= 1 &&
+                                !rx_match_filter(intf, frame, true)))) {
+            d_warn("cduart: filtered, len: %d, [%02x, %02x ...]\n",
+                    intf->rx_byte_cnt, frame->dat[0], frame->dat[1]);
+            intf->rx_byte_cnt = 0;
+            intf->rx_crc = 0xffff;
+            return;
+        }
+
+        for (i = 0; i < cpy_len; i++)
+            crc16_byte(*(rd + i), &intf->rx_crc);
+        rd += cpy_len;
+
+        if (intf->rx_byte_cnt == frame->dat[2] + 5) {
+            if (intf->rx_crc != 0) {
+                d_error("cduart: crc error\n");
+            } else {
+                list_node_t *node = cduart_list_get(intf->free_head);
+                if (node != NULL) {
+                    d_verbose("cduart: rx [%02x, %02x, %02x ...]\n",
+                            frame->dat[0], frame->dat[1], frame->dat[2]);
+                    cduart_list_put(&intf->rx_head, intf->rx_node);
+                    intf->rx_node = node;
+                } else {
+                    // set rx_lost flag
+                    d_error("cduart: rx_lost\n");
+                }
+            }
+            intf->rx_byte_cnt = 0;
+            intf->rx_crc = 0xffff;
+        }
     }
-
-    cduart_tx_task(intf);
 }
-

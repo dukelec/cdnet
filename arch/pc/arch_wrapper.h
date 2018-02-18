@@ -22,6 +22,7 @@
 #define local_irq_disable()         \
     do { } while (0)
 
+
 typedef struct {
     char    *port;
     int     fd;
@@ -29,10 +30,7 @@ typedef struct {
 } uart_t;
 
 uint32_t get_systick(void);
-int uart_receive(uart_t *uart, uint8_t *buf, uint16_t len);
 int uart_transmit(uart_t *uart, const uint8_t *buf, uint16_t len);
-int uart_set_attribs(int fd, int speed);
-void uart_set_mincount(int fd, int mcount);
 
 
 #ifndef SYSTICK_US_DIV
@@ -40,4 +38,3 @@ void uart_set_mincount(int fd, int mcount);
 #endif
 
 #endif
-

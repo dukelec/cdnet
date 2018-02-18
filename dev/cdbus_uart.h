@@ -11,26 +11,15 @@
 #define __CDBUS_UART_H__
 
 #include "common.h"
+#include "modbus_crc.h"
 #include "cdnet.h"
 
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
 
-#ifdef CDUART_IT
-#define CDUART_RX_IT
-#define CDUART_TX_IT
-#endif
-
-#if defined(CDUART_TX_IT) || defined(CDUART_RX_IT)
-#define CDUART_IRQ_SAFE
-#endif
-
-
 typedef struct cduart_intf {
     cd_intf_t           cd_intf;
-
-    uart_t              *uart;
 
     list_head_t         *free_head;
     list_head_t         rx_head;
@@ -41,8 +30,6 @@ typedef struct cduart_intf {
     uint16_t            rx_crc;
     uint32_t            t_last;      // last receive time
 
-    list_node_t         *tx_node;
-
     uint8_t             local_filter[8];
     uint8_t             remote_filter[8];
     uint8_t             local_filter_len;
@@ -50,13 +37,14 @@ typedef struct cduart_intf {
 } cduart_intf_t;
 
 
-void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head,
-    uart_t *uart);
+void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head);
+void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len);
 
-// you can call rx and tx task respectively or call a single task
-void cduart_rx_task(cduart_intf_t *intf, uint8_t val);
-void cduart_tx_task(cduart_intf_t *intf);
-void cduart_task(cduart_intf_t *intf);
+static inline void cduart_fill_crc(uint8_t *dat)
+{
+    uint16_t crc_val = crc16(dat, dat[2] + 3);
+    dat[dat[2] + 3] = crc_val & 0xff;
+    dat[dat[2] + 4] = crc_val >> 8;
+}
 
 #endif
-
