@@ -116,7 +116,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 
         if (intf->rx_byte_cnt != 0 &&
                 get_systick() - intf->t_last > CDUART_IDLE_TIME) {
-            d_debug("cduart: drop packet, cnt: %d\n", intf->rx_byte_cnt);
+            d_warn("cduart: drop timeout, cnt: %d\n", intf->rx_byte_cnt);
             intf->rx_byte_cnt = 0;
             intf->rx_crc = 0xffff;
         }

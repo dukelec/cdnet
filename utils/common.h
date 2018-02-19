@@ -76,7 +76,7 @@
 
 void _dprintf(char *format, ...);
 void dputs(char *str);
-void dputhex(int n);
+void dhtoa(uint32_t val, char *buf);
 void debug_init(void);
 void debug_flush(void);
 #endif // OVERRIDE_DEBUG

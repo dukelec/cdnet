@@ -164,6 +164,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->rst_n = rst_n;
     intf->int_n = int_n;
 
+    d_info("cdctl %p: init...\n", intf);
     if (rst_n) {
         gpio_set_value(rst_n, 0);
         gpio_set_value(rst_n, 1);
@@ -176,7 +177,6 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
             d_info("cdctl %p: version: %02x\n", intf, ver);
             break;
         }
-        d_info("cdctl %p: not ready, ver: %02x\n", intf, ver);
         debug_flush();
     }
 

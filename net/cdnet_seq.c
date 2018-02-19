@@ -441,7 +441,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         if (r->seq_num & 0x80) {
             list_node_t *node = cdnet_list_get(intf->free_head);
             if (!node) {
-                d_error("cdnet %p: no free pkt (set seq)\n", intf);
+                d_error("cdnet %p: no free pkt (set seq_no)\n", intf);
                 continue;
             }
             r->seq_num = 0;
@@ -470,7 +470,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                 // send check
                 list_node_t *node = cdnet_list_get(intf->free_head);
                 if (!node) {
-                    d_error("cdnet %p: no free pkt\n", intf);
+                    d_error("cdnet %p: no free pkt (check seq_no)\n", intf);
                     continue;
                 }
                 r->p0_req = container_of(node, cdnet_packet_t, node);

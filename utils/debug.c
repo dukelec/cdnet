@@ -31,6 +31,7 @@ static dbg_node_t dbg_alloc[DBG_LEN];
 
 static list_head_t dbg_free = {0};
 static list_head_t dbg_tx = {0};
+static int dbg_lost_cnt = 0;
 
 
 // for dprintf
@@ -39,12 +40,7 @@ void _dprintf(char* format, ...)
 {
     list_node_t *node;
 
-    while (true) {
-        node = list_get_irq_safe(&dbg_free);
-        if (node)
-            break;
-        debug_flush();
-    }
+    node = list_get_irq_safe(&dbg_free);
     if (node) {
         dbg_node_t *buf = container_of(node, dbg_node_t, node);
         va_list arg;
@@ -53,6 +49,11 @@ void _dprintf(char* format, ...)
         buf->len = vsnprintf((char *)buf->data, LINE_LEN, format, arg);
         va_end (arg);
         list_put_irq_safe(&dbg_tx, node);
+    } else {
+        uint32_t flags;
+        local_irq_save(flags);
+        dbg_lost_cnt++;
+        local_irq_restore(flags);
     }
 }
 
@@ -69,18 +70,16 @@ void dputs(char *str)
     }
 }
 
-void dputhex(int n)
+void dhtoa(uint32_t val, char *buf)
 {
-    char buf[10];
     const char tlb[] = "0123456789abcdef";
     int i;
 
     for (i = 0; i < 8; i++) {
-        buf[7 - i] = tlb[n & 0xf];
-        n >>= 4;
+        buf[7 - i] = tlb[val & 0xf];
+        val >>= 4;
     }
     buf[8] = '\0';
-    dputs(buf);
 }
 
 void debug_init(void)
@@ -92,13 +91,33 @@ void debug_init(void)
 
 void debug_flush(void)
 {
+    static int dbg_lost_last = 0;
+
     while (true) {
+#ifdef DBG_TX_IT
+        static dbg_node_t *cur_buf = NULL;
+        if (!uart_transmit_is_ready(&debug_uart))
+            return;
+        if (cur_buf)
+            list_put_irq_safe(&dbg_free, &cur_buf->node);
+#endif
+
+        if (dbg_lost_last != dbg_lost_cnt) {
+            _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
+            dbg_lost_last = dbg_lost_cnt;
+        }
+
         list_node_t *node = list_get_irq_safe(&dbg_tx);
         if (!node)
             break;
         dbg_node_t *buf = container_of(node, dbg_node_t, node);
+#ifdef DBG_TX_IT
+        uart_transmit_it(&debug_uart, buf->data, buf->len);
+        cur_buf = buf;
+#else
         uart_transmit(&debug_uart, buf->data, buf->len);
         list_put_irq_safe(&dbg_free, node);
+#endif
     }
 }
 
