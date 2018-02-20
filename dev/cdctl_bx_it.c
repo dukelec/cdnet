@@ -81,50 +81,48 @@ void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
 
 static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(cdctl_intf, REG_FILTER, filter);
-    cdctl_write_reg(cdctl_intf, REG_TX_WAIT_LEN,
-            filter == 255 ? 255 : filter + 1);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_write_reg(intf, REG_FILTER, filter);
+    cdctl_write_reg(intf, REG_TX_WAIT_LEN, min(255, filter + 1));
 }
 
 static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return cdctl_read_reg(cdctl_intf, REG_FILTER);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    return cdctl_read_reg(intf, REG_FILTER);
 }
 
 static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
         uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     l = ((float)CDCTL_SYS_CLK / low) - 1 + 0.5;
     h = ((float)CDCTL_SYS_CLK / high) - 1 + 0.5;
-    cdctl_write_reg(cdctl_intf, REG_DIV_LS_L, l & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_DIV_LS_H, l >> 8);
-    cdctl_write_reg(cdctl_intf, REG_DIV_HS_L, h & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_DIV_HS_H, h >> 8);
-    d_debug("cdctl %p: set baud rate: %u %u (%u %u)\n",
-            cd_intf, low, high, l, h);
+    cdctl_write_reg(intf, REG_DIV_LS_L, l & 0xff);
+    cdctl_write_reg(intf, REG_DIV_LS_H, l >> 8);
+    cdctl_write_reg(intf, REG_DIV_HS_L, h & 0xff);
+    cdctl_write_reg(intf, REG_DIV_HS_H, h >> 8);
+    dd_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
 static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
         uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    l = cdctl_read_reg(cdctl_intf, REG_DIV_LS_L) |
-            cdctl_read_reg(cdctl_intf, REG_DIV_LS_H) << 8;
-    h = cdctl_read_reg(cdctl_intf, REG_DIV_HS_L) |
-            cdctl_read_reg(cdctl_intf, REG_DIV_HS_H) << 8;
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    l = cdctl_read_reg(intf, REG_DIV_LS_L) |
+            cdctl_read_reg(intf, REG_DIV_LS_H) << 8;
+    h = cdctl_read_reg(intf, REG_DIV_HS_L) |
+            cdctl_read_reg(intf, REG_DIV_HS_H) << 8;
     *low = ((float)CDCTL_SYS_CLK / (l + 1)) + 0.5;
     *high = ((float)CDCTL_SYS_CLK / (h + 1)) + 0.5;
 }
 
 static void cdctl_flush(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(cdctl_intf, REG_RX_CTRL, BIT_RX_RST);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_RST);
 }
 
 
@@ -134,6 +132,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 {
     list_node_t *node = list_get(free_head);
 
+    if (!intf->name)
+        intf->name = "cdctl";
     intf->rx_frame = container_of(node, cd_frame_t, node);
     intf->free_head = free_head;
     intf->cd_intf.get_free_node = cdctl_get_free_node;
@@ -164,7 +164,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->rst_n = rst_n;
     intf->int_n = int_n;
 
-    d_info("cdctl %p: init...\n", intf);
+    dd_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
         gpio_set_value(rst_n, 1);
@@ -174,7 +174,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         uint8_t ver = cdctl_read_reg(intf, REG_VERSION);
         if (ver != 0xff && ver != 0x00 &&
                 ver == cdctl_read_reg(intf, REG_VERSION)) {
-            d_info("cdctl %p: version: %02x\n", intf, ver);
+            dd_info(intf->name, "version: %02x\n", ver);
             break;
         }
         debug_flush();
@@ -185,8 +185,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
     cdctl_flush(&intf->cd_intf);
 
-    d_debug("cdctl %p: flags: %02x\n", intf,
-            cdctl_read_reg(intf, REG_INT_FLAG));
+    dd_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
     cdctl_write_reg(intf, REG_INT_MASK, CDCTL_MASK);
     // int_n interrupt enabled by default
 }
@@ -368,5 +367,5 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
         return;
     }
 
-    d_warn("cdctl %p: unexpected spi dma callback\n", intf);
+    dd_warn(intf->name, "unexpected spi dma cb\n");
 }

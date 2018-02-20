@@ -15,6 +15,8 @@
 
 typedef struct {
     cd_intf_t   cd_intf;
+    const char  *name;
+
     list_head_t *free_head;
     list_head_t rx_head;
     list_head_t tx_head;

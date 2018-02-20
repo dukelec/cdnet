@@ -14,10 +14,10 @@
 extern uart_t debug_uart;
 
 #ifndef LINE_LEN
-    #define LINE_LEN 80
+    #define LINE_LEN    80
 #endif
 #ifndef DBG_LEN
-    #define DBG_LEN 60
+    #define DBG_LEN     60
 #endif
 
 typedef struct {

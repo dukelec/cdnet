@@ -56,74 +56,72 @@ static void cdctl_write_frame(cdctl_intf_t *intf, const cd_frame_t *frame)
 
 static list_node_t *cdctl_get_free_node(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get(cdctl_intf->free_head);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    return list_get(intf->free_head);
 }
 
 static list_node_t *cdctl_get_rx_node(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get(&cdctl_intf->rx_head);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    return list_get(&intf->rx_head);
 }
 
 static void cdctl_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    list_put(cdctl_intf->free_head, node);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    list_put(intf->free_head, node);
 }
 
 static void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    list_put(&cdctl_intf->tx_head, node);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    list_put(&intf->tx_head, node);
 }
 
 static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(cdctl_intf, REG_FILTER, filter);
-    cdctl_write_reg(cdctl_intf, REG_TX_WAIT_LEN,
-            filter == 255 ? 255 : filter + 1);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_write_reg(intf, REG_FILTER, filter);
+    cdctl_write_reg(intf, REG_TX_WAIT_LEN, min(255, filter + 1));
 }
 
 static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return cdctl_read_reg(cdctl_intf, REG_FILTER);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    return cdctl_read_reg(intf, REG_FILTER);
 }
 
 static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
         uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     l = ((float)CDCTL_SYS_CLK / low) - 1 + 0.5;
     h = ((float)CDCTL_SYS_CLK / high) - 1 + 0.5;
-    cdctl_write_reg(cdctl_intf, REG_DIV_LS_L, l & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_DIV_LS_H, l >> 8);
-    cdctl_write_reg(cdctl_intf, REG_DIV_HS_L, h & 0xff);
-    cdctl_write_reg(cdctl_intf, REG_DIV_HS_H, h >> 8);
-    d_debug("cdctl %p: set baud rate: %u %u (%u %u)\n",
-            cd_intf, low, high, l, h);
+    cdctl_write_reg(intf, REG_DIV_LS_L, l & 0xff);
+    cdctl_write_reg(intf, REG_DIV_LS_H, l >> 8);
+    cdctl_write_reg(intf, REG_DIV_HS_L, h & 0xff);
+    cdctl_write_reg(intf, REG_DIV_HS_H, h >> 8);
+    dd_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
 static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
         uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    l = cdctl_read_reg(cdctl_intf, REG_DIV_LS_L) |
-            cdctl_read_reg(cdctl_intf, REG_DIV_LS_H) << 8;
-    h = cdctl_read_reg(cdctl_intf, REG_DIV_HS_L) |
-            cdctl_read_reg(cdctl_intf, REG_DIV_HS_H) << 8;
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    l = cdctl_read_reg(intf, REG_DIV_LS_L) |
+            cdctl_read_reg(intf, REG_DIV_LS_H) << 8;
+    h = cdctl_read_reg(intf, REG_DIV_HS_L) |
+            cdctl_read_reg(intf, REG_DIV_HS_H) << 8;
     *low = ((float)CDCTL_SYS_CLK / (l + 1)) + 0.5;
     *high = ((float)CDCTL_SYS_CLK / (h + 1)) + 0.5;
 }
 
 static void cdctl_flush(cd_intf_t *cd_intf)
 {
-    cdctl_intf_t *cdctl_intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(cdctl_intf, REG_RX_CTRL, BIT_RX_RST);
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_RST);
 }
 
 void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
@@ -134,6 +132,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         spi_t *spi, gpio_t *rst_n)
 #endif
 {
+    if (!intf->name)
+        intf->name = "cdctl";
     intf->free_head = free_head;
     intf->cd_intf.get_free_node = cdctl_get_free_node;
     intf->cd_intf.get_rx_node = cdctl_get_rx_node;
@@ -158,6 +158,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 #endif
     intf->rst_n = rst_n;
 
+    dd_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
         gpio_set_value(rst_n, 1);
@@ -167,10 +168,9 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         uint8_t ver = cdctl_read_reg(intf, REG_VERSION);
         if (ver != 0xff && ver != 0x00 &&
                 ver == cdctl_read_reg(intf, REG_VERSION)) {
-            d_info("cdctl %p: version: %02x\n", intf, ver);
+            dd_info(intf->name, "version: %02x\n", ver);
             break;
         }
-        d_info("cdctl %p: not ready, ver: %02x\n", intf, ver);
         debug_flush();
     }
 
@@ -179,8 +179,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
     cdctl_flush(&intf->cd_intf);
 
-    d_debug("cdctl %p: flags: %02x\n", intf,
-            cdctl_read_reg(intf, REG_INT_FLAG));
+    dd_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
 }
 
 // handlers
@@ -191,19 +190,19 @@ void cdctl_task(cdctl_intf_t *intf)
     uint8_t flags = cdctl_read_reg(intf, REG_INT_FLAG);
 
     if (flags & BIT_FLAG_RX_LOST) {
-        d_error("cdctl %p: BIT_FLAG_RX_LOST\n", intf);
+        dd_error(intf->name, "BIT_FLAG_RX_LOST\n");
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_LOST);
     }
     if (flags & BIT_FLAG_RX_ERROR) {
-        d_warn("cdctl %p: BIT_FLAG_RX_ERROR\n", intf);
+        dd_warn(intf->name, "BIT_FLAG_RX_ERROR\n");
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_ERROR);
     }
     if (flags & BIT_FLAG_TX_CD) {
-        d_debug("cdctl %p: BIT_FLAG_TX_CD\n", intf);
+        dd_debug(intf->name, "BIT_FLAG_TX_CD\n");
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_CD);
     }
     if (flags & BIT_FLAG_TX_ERROR) {
-        d_error("cdctl %p: BIT_FLAG_TX_ERROR\n", intf);
+        dd_error(intf->name, "BIT_FLAG_TX_ERROR\n");
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_ERROR);
     }
 
@@ -211,29 +210,29 @@ void cdctl_task(cdctl_intf_t *intf)
         // if get free list: copy to rx list
         list_node_t *node = list_get(intf->free_head);
         if (node) {
-            d_verbose("cdctl %p: get_rx\n", intf);
+            dd_verbose(intf->name, "get_rx\n");
             cd_frame_t *frame = container_of(node, cd_frame_t, node);
             cdctl_read_frame(intf, frame);
             cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_PENDING);
             list_put(&intf->rx_head, node);
         } else {
-            d_error("cdctl %p: get_rx, no free node\n", intf);
+            dd_error(intf->name, "get_rx, no free node\n");
         }
     }
 
     if (!intf->is_pending && intf->tx_head.first) {
         list_node_t *node = list_get(&intf->tx_head);
         cd_frame_t *frame = container_of(node, cd_frame_t, node);
-        d_verbose("cdctl %p: write frame\n", intf);
+        dd_verbose(intf->name, "write frame\n");
         cdctl_write_frame(intf, frame);
 
         flags = cdctl_read_reg(intf, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
-            d_verbose("cdctl %p: trigger tx\n", intf);
+            dd_verbose(intf->name, "trigger tx\n");
             cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
         } else {
             intf->is_pending = true;
-            d_verbose("cdctl %p: pending\n", intf);
+            dd_verbose(intf->name, "pending\n");
         }
         list_put(intf->free_head, node);
     }
@@ -241,7 +240,7 @@ void cdctl_task(cdctl_intf_t *intf)
     if (intf->is_pending) {
         flags = cdctl_read_reg(intf, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
-            d_verbose("cdctl %p: trigger pending tx\n", intf);
+            dd_verbose(intf->name, "trigger pending tx\n");
             cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
             intf->is_pending = false;
         }

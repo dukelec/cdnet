@@ -46,6 +46,8 @@ static void cduart_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
 
 void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head)
 {
+    if (!intf->name)
+        intf->name = "cduart";
     intf->free_head = free_head;
 
     intf->cd_intf.get_free_node = cduart_get_free_node;
@@ -116,7 +118,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 
         if (intf->rx_byte_cnt != 0 &&
                 get_systick() - intf->t_last > CDUART_IDLE_TIME) {
-            d_warn("cduart: drop timeout, cnt: %d\n", intf->rx_byte_cnt);
+            dd_warn(intf->name, "drop timeout, cnt: %d\n", intf->rx_byte_cnt);
             intf->rx_byte_cnt = 0;
             intf->rx_crc = 0xffff;
         }
@@ -135,7 +137,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
                         !rx_match_filter(intf, frame, false)) ||
                         (intf->rx_byte_cnt >= 1 &&
                                 !rx_match_filter(intf, frame, true)))) {
-            d_warn("cduart: filtered, len: %d, [%02x, %02x ...]\n",
+            dd_warn(intf->name, "filtered, len: %d, [%02x, %02x ...]\n",
                     intf->rx_byte_cnt, frame->dat[0], frame->dat[1]);
             intf->rx_byte_cnt = 0;
             intf->rx_crc = 0xffff;
@@ -148,17 +150,17 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 
         if (intf->rx_byte_cnt == frame->dat[2] + 5) {
             if (intf->rx_crc != 0) {
-                d_error("cduart: crc error\n");
+                dd_error(intf->name, "crc error\n");
             } else {
                 list_node_t *node = cduart_list_get(intf->free_head);
                 if (node != NULL) {
-                    d_verbose("cduart: rx [%02x, %02x, %02x ...]\n",
+                    dd_verbose(intf->name, "rx [%02x, %02x, %02x ...]\n",
                             frame->dat[0], frame->dat[1], frame->dat[2]);
                     cduart_list_put(&intf->rx_head, intf->rx_node);
                     intf->rx_node = node;
                 } else {
                     // set rx_lost flag
-                    d_error("cduart: rx_lost\n");
+                    dd_error(intf->name, "rx_lost\n");
                 }
             }
             intf->rx_byte_cnt = 0;

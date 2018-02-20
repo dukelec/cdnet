@@ -10,7 +10,7 @@
 #include "cdnet.h"
 
 #if __BYTE_ORDER != __LITTLE_ENDIAN
-# error "Please fix endianness of multicast_id and ports"
+#error "Please fix endianness of multicast_id and ports"
 #endif
 
 #define assert(expr) { if (!(expr)) return ERR_ASSERT; }

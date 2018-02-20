@@ -30,6 +30,8 @@ typedef enum {
 
 typedef struct {
     cd_intf_t       cd_intf;
+    const char      *name;
+
     cdctl_state_t   state;
     bool            manual_ctrl;
 

@@ -176,6 +176,7 @@ typedef struct {
 } seq_tx_rec_t;
 
 typedef struct {
+    const char      *name;
     cdnet_addr_t    addr; // interface address
     uint8_t         l0_last_port; // don't override before receive the reply
 

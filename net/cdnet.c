@@ -29,6 +29,8 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf);
 void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
         cd_intf_t *cd_intf, cdnet_addr_t *addr)
 {
+    if (!intf->name)
+        intf->name = "cdnet";
     intf->addr.net = addr->net;
     intf->addr.mac = addr->mac; // 255: unspecified
     intf->free_head = free_head;
@@ -95,7 +97,7 @@ void cdnet_rx(cdnet_intf_t *intf)
     int ret_val;
 
     if (!intf->free_head->first) {
-        d_warn("cdnet %p: no free node for rx\n", intf);
+        dd_warn(intf->name, "rx: no free pkt\n");
         return;
     }
 
@@ -117,12 +119,12 @@ void cdnet_rx(cdnet_intf_t *intf)
     cd_intf->put_free_node(cd_intf, cd_node);
 
     if (ret_val != 0) {
-        d_error("cdnet %p: cdnet_from_frame failed\n", intf);
+        dd_error(intf->name, "rx: from_frame err\n");
         cdnet_list_put(intf->free_head, net_node);
         return;
     }
     if (pkt->multi & CDNET_MULTI_CAST) {
-        d_error("cdnet %p: not support multicast yet\n", intf);
+        dd_error(intf->name, "rx: not support multicast yet\n");
         cdnet_list_put(intf->free_head, net_node);
         return;
     }
