@@ -23,15 +23,7 @@
     do { } while (0)
 
 
-typedef struct {
-    char    *port;
-    int     fd;
-    bool    is_stdout;
-} uart_t;
-
 uint32_t get_systick(void);
-int uart_transmit(uart_t *uart, const uint8_t *buf, uint16_t len);
-
 
 #ifndef SYSTICK_US_DIV
 #define SYSTICK_US_DIV  1000
