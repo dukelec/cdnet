@@ -27,15 +27,15 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf);
 
 
 void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
-        cd_intf_t *cd_intf, uint8_t mac)
+        cd_intf_t *cd_intf, cdnet_addr_t *addr)
 {
-    intf->mac = mac; // 255: unspecified
+    intf->addr.net = addr->net;
+    intf->addr.mac = addr->mac; // 255: unspecified
     intf->free_head = free_head;
 
     intf->cd_intf = cd_intf;
 
 #ifdef USE_DYNAMIC_INIT
-    intf->net = 0;
     intf->l0_last_port = 0;
     list_head_init(&intf->rx_head);
     list_head_init(&intf->tx_head);
@@ -49,7 +49,7 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 
 void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
-    uint8_t tmp_addr[2];
+    cdnet_addr_t tmp_addr;
     uint8_t tmp_mac;
     uint16_t tmp_port;
 
@@ -58,16 +58,15 @@ void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     pkt->dst_mac = tmp_mac;
 
     if (pkt->src_mac == 255)
-        pkt->src_mac = intf->mac;
+        pkt->src_mac = intf->addr.mac;
 
-    if (pkt->level == CDNET_L1 && pkt->is_multi_net) {
-        memcpy(tmp_addr, pkt->src_addr, 2);
-        memcpy(pkt->src_addr, pkt->dst_addr, 2);
-        memcpy(pkt->dst_addr, tmp_addr, 2);
-        if (pkt->is_multicast) {
-            pkt->is_multicast = false;
-            pkt->src_addr[0] = intf->net;
-            pkt->src_addr[1] = intf->mac;
+    if (pkt->level == CDNET_L1 && pkt->multi) {
+        tmp_addr = pkt->src_addr;
+        pkt->src_addr = pkt->dst_addr;
+        pkt->dst_addr = tmp_addr;
+        if (pkt->multi & CDNET_MULTI_CAST) {
+            pkt->multi &= (~CDNET_MULTI_CAST) & 3;
+            pkt->src_addr = intf->addr;
         }
     }
 
@@ -80,34 +79,9 @@ void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
-    pkt->src_mac = intf->mac;
-
-    if (pkt->level == CDNET_L1 && pkt->is_multi_net) {
-        pkt->src_addr[0] = intf->net;
-        pkt->src_addr[1] = intf->mac;
-    }
-}
-
-void cdnet_cpy_dst_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt,
-        const cdnet_packet_t *ref, bool is_ret)
-{
-    // don't forget to set pkt->level and pkt->is_seq
-
-    pkt->dst_mac = is_ret ? ref->src_mac : ref->dst_mac;
-
-    pkt->is_multi_net = false;
-    pkt->is_multicast = false;
-
-    if (ref->level == CDNET_L1) {
-        if (ref->is_multi_net) {
-            pkt->is_multi_net = true;
-            memcpy(pkt->dst_addr, is_ret ? ref->src_addr : ref->dst_addr, 2);
-        }
-        if (ref->is_multicast) {
-            pkt->is_multicast = true;
-            pkt->multicast_id = ref->multicast_id;
-        }
-    }
+    pkt->src_mac = intf->addr.mac;
+    if (pkt->level == CDNET_L1 && pkt->multi >= CDNET_MULTI_NET)
+        pkt->src_addr = intf->addr;
 }
 
 //
@@ -147,7 +121,7 @@ void cdnet_rx(cdnet_intf_t *intf)
         cdnet_list_put(intf->free_head, net_node);
         return;
     }
-    if (pkt->is_multicast) {
+    if (pkt->multi & CDNET_MULTI_CAST) {
         d_error("cdnet %p: not support multicast yet\n", intf);
         cdnet_list_put(intf->free_head, net_node);
         return;
@@ -163,7 +137,7 @@ void cdnet_rx(cdnet_intf_t *intf)
         cdnet_p0_reply_handle(intf, pkt);
         return;
     }
-    if (pkt->level != CDNET_L0 && pkt->is_seq) {
+    if (pkt->level != CDNET_L0 && pkt->seq) {
         cdnet_seq_rx_handle(intf, pkt);
         return;
     }

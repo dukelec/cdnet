@@ -16,6 +16,10 @@
 #define CDNET_DEF_PORT      0xcdcd
 #endif
 
+#ifndef CDNET_DAT_SIZE
+#define CDNET_DAT_SIZE      252
+#endif
+
 #ifndef SEQ_RX_REC_MAX
 #define SEQ_RX_REC_MAX      3
 #endif
@@ -50,23 +54,34 @@ typedef enum {
     CDNET_L2
 } cdnet_level_t;
 
-#define HDR_L1_L2           (1 << 7)
-#define HDR_L2              (1 << 6)
+typedef enum {
+    CDNET_MULTI_NONE = 0,
+    CDNET_MULTI_CAST,
+    CDNET_MULTI_NET,
+    CDNET_MULTI_CAST_NET
 
-#define HDR_L0_REPLY        (1 << 6)
-#define HDR_L0_SHARE        (1 << 5)
+} cdnet_multi_t;
 
-#define HDR_L1_MULTI_NET    (1 << 5)
-#define HDR_L1_MULTICAST    (1 << 4)
-#define HDR_L1_SEQ_NUM      (1 << 3)
+typedef enum {
+    CDNET_FRAG_NONE = 0,
+    CDNET_FRAG_FIRST,
+    CDNET_FRAG_MORE,
+    CDNET_FRAG_LAST
+} cdnet_frag_t;
 
-#define HDR_L2_FRAGMENT     (1 << 5)
-#define HDR_L2_FRAGMENT_END (1 << 4)
-#define HDR_L2_SEQ_NUM      (1 << 3)
-#define HDR_L2_COMPRESSED   (1 << 2)
+#define HDR_L1_L2       (1 << 7)
+#define HDR_L2          (1 << 6)
+
+#define HDR_L0_REPLY    (1 << 6)
+#define HDR_L0_SHARE    (1 << 5)
+
+#define HDR_L1_SEQ      (1 << 3)
+
+#define HDR_L2_SEQ      (1 << 3)
+#define HDR_L2_COMPR    (1 << 2)
 
 
-#define ERR_ASSERT          -1
+#define ERR_ASSERT      -1
 
 
 // cd: base class for MAC layer
@@ -96,55 +111,58 @@ typedef struct cd_intf {
 } cd_intf_t;
 
 
+typedef struct{
+    uint8_t     net; // net id
+    uint8_t     mac; // mac id
+} cdnet_addr_t;
+
 typedef struct {
     list_node_t     node;
 
     cdnet_level_t   level;
 
-    bool            is_seq;
+    bool            seq; // enable sequence
     // set by cdnet_tx:
-    bool            req_ack;
-    uint8_t         seq_num;
-    uint32_t        send_time;
+    bool            _req_ack;
+    uint8_t         _seq_num;
+    uint32_t        _send_time;
 
-    bool            is_multi_net;
-    bool            is_multicast;
+    cdnet_multi_t   multi;
 
+    // local send and receive addresses
     uint8_t         src_mac;
     uint8_t         dst_mac;
-    uint8_t         src_addr[2]; // [net, mac]
-    uint8_t         dst_addr[2];
 
-    uint16_t        multicast_id;
+    // original send and receive addresses
+    cdnet_addr_t    src_addr;
+    union {
+        cdnet_addr_t    __dst_addr;
+        uint16_t        __multicast_id;
+    } __dst_u;
+#define dst_addr        __dst_u.__dst_addr
+#define multicast_id    __dst_u.__multicast_id
 
     uint16_t        src_port;
     uint16_t        dst_port;
 
     // level 2 only
-    bool            is_fragment;
-    bool            is_fragment_end;
-    bool            is_compressed;
+    cdnet_frag_t    frag;
+    bool            compr;
 
     int             len;
-    uint8_t         dat[252];
+    uint8_t         dat[CDNET_DAT_SIZE];
 } cdnet_packet_t;
 
 
 typedef struct {
     list_node_t     node;
-    bool            is_multi_net;
-    uint8_t         net;
-    uint8_t         mac;
-
+    cdnet_addr_t    addr; // net = 255: link local; mac = 255: not used
     uint8_t         seq_num;
 } seq_rx_rec_t;
 
 typedef struct {
     list_node_t     node;
-    bool            is_multi_net;
-    uint8_t         net;
-    uint8_t         mac;
-
+    cdnet_addr_t    addr; // net = 255: link local; mac = 255: not used
     uint8_t         seq_num;
 
     // for tx only
@@ -158,8 +176,7 @@ typedef struct {
 } seq_tx_rec_t;
 
 typedef struct {
-    uint8_t         mac;
-    uint8_t         net;
+    cdnet_addr_t    addr; // interface address
     uint8_t         l0_last_port; // don't override before receive the reply
 
     list_head_t     *free_head;
@@ -177,18 +194,21 @@ typedef struct {
 
 
 void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
-    cd_intf_t *cd_intf, uint8_t mac);
+    cd_intf_t *cd_intf, cdnet_addr_t *addr);
 
 
 // helper
 
 void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt);
-void cdnet_cpy_dst_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt,
-        const cdnet_packet_t *ref, bool is_ret);
 
 void cdnet_rx(cdnet_intf_t *intf);
 void cdnet_tx(cdnet_intf_t *intf);
+
+static inline bool is_addr_equal(const cdnet_addr_t *a, const cdnet_addr_t *b)
+{
+    return a->mac == b->mac && a->net == b->net;
+}
 
 #endif
 

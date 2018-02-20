@@ -13,6 +13,17 @@
 #define assert(expr) { if (!(expr)) return ERR_ASSERT; }
 
 
+int cdnet_l1_to_l0_test(cdnet_packet_t *pkt)
+{
+    assert(pkt->level <= CDNET_L1);
+    assert(pkt->src_port == CDNET_DEF_PORT && pkt->dst_port <= 63);
+    if (pkt->level == CDNET_L1) {
+        assert(!pkt->seq && pkt->multi == CDNET_MULTI_NONE);
+    }
+    return 0;
+}
+
+
 int cdnet_l0_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
 {
     uint8_t *buf_s = buf;

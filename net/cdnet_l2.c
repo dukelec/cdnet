@@ -31,19 +31,17 @@ int cdnet_l2_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
 
     *buf++ = HDR_L1_L2 | HDR_L2; // hdr
 
-    if (pkt->is_fragment) {
-        assert(pkt->is_seq);
-        *hdr |= HDR_L2_FRAGMENT;
-        if (pkt->is_fragment_end)
-            *hdr |= HDR_L2_FRAGMENT_END;
+    if (pkt->frag) {
+        assert(pkt->seq);
+        *hdr |= pkt->frag << 4;
     }
 
-    if (pkt->is_compressed)
-        *hdr |= HDR_L2_COMPRESSED;
+    if (pkt->compr)
+        *hdr |= HDR_L2_COMPR;
 
-    if (pkt->is_seq) {
-        *hdr |= HDR_L2_SEQ_NUM;
-        *buf++ = pkt->seq_num | (pkt->req_ack << 7);
+    if (pkt->seq) {
+        *hdr |= HDR_L2_SEQ;
+        *buf++ = pkt->_seq_num | (pkt->_req_ack << 7);
     }
 
     assert(buf - buf_s + pkt->len <= 256);
@@ -60,7 +58,7 @@ int cdnet_l2_from_frame(cdnet_intf_t *intf,
 
     assert((*hdr & 0xc0) == 0xc0);
     pkt->level = CDNET_L2;
-    pkt->is_seq = !!(*hdr & HDR_L1_SEQ_NUM);
+    pkt->seq = !!(*hdr & HDR_L2_SEQ);
 
     pkt->src_mac = *buf++;
     pkt->dst_mac = *buf++;
@@ -68,23 +66,22 @@ int cdnet_l2_from_frame(cdnet_intf_t *intf,
 
     buf++; // skip hdr
 
-    if (*hdr & HDR_L2_FRAGMENT) {
-        assert(pkt->is_seq);
-        pkt->is_fragment = true;
-        pkt->is_fragment_end = !!(*hdr & HDR_L2_FRAGMENT_END);
+    if (*hdr & 0x30) {
+        assert(pkt->seq);
+        pkt->frag = (*hdr >> 4) & 3;
     } else {
-        pkt->is_fragment = false;
+        pkt->frag = CDNET_FRAG_NONE;
     }
 
-    pkt->is_compressed = !!(*hdr & HDR_L2_COMPRESSED);
+    pkt->compr = !!(*hdr & HDR_L2_COMPR);
 
-    if (pkt->is_seq) {
-        pkt->seq_num = *buf++;
-        pkt->req_ack = !!(pkt->seq_num & 0x80);
-        pkt->seq_num &= 0x7f;
+    if (pkt->seq) {
+        pkt->_seq_num = *buf++;
+        pkt->_req_ack = !!(pkt->_seq_num & 0x80);
+        pkt->_seq_num &= 0x7f;
     }
 
-    pkt->len = tmp_len - (pkt->is_seq ? 2 : 1);
+    pkt->len = tmp_len - (pkt->seq ? 2 : 1);
     assert(pkt->len >= 0);
     memcpy(pkt->dat, buf, pkt->len);
     return 0;

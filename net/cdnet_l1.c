@@ -7,8 +7,11 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-
 #include "cdnet.h"
+
+#if __BYTE_ORDER != __LITTLE_ENDIAN
+# error "Please fix endianness of multicast_id and ports"
+#endif
 
 #define assert(expr) { if (!(expr)) return ERR_ASSERT; }
 
@@ -75,26 +78,25 @@ int cdnet_l1_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
     *buf++ = pkt->src_mac;
     *buf++ = pkt->dst_mac;
     buf++; // fill at end
-    *buf++ = HDR_L1_L2; // hdr
+    *buf++ = HDR_L1_L2 | (pkt->multi << 4); // hdr
 
-    if (pkt->is_multi_net) {
-        *hdr |= HDR_L1_MULTI_NET;
-        *buf++ = pkt->src_addr[0];
-        *buf++ = pkt->src_addr[1];
-        if (!pkt->is_multicast) {
-            *buf++ = pkt->dst_addr[0];
-            *buf++ = pkt->dst_addr[1];
-        }
-    }
-    if (pkt->is_multicast) {
-        *hdr |= HDR_L1_MULTICAST;
-        *buf++ = pkt->multicast_id & 0xff;
-        *buf++ = pkt->multicast_id >> 8;
+    switch (pkt->multi) {
+    case CDNET_MULTI_CAST_NET:
+    case CDNET_MULTI_NET:
+        *buf++ = pkt->src_addr.net;
+        *buf++ = pkt->src_addr.mac;
+        // no break
+    case CDNET_MULTI_CAST:
+        // multicast_id also copied
+        *buf++ = pkt->dst_addr.net;
+        *buf++ = pkt->dst_addr.mac;
+    default:
+        break;
     }
 
-    if (pkt->is_seq) {
-        *hdr |= HDR_L1_SEQ_NUM;
-        *buf++ = pkt->seq_num | (pkt->req_ack << 7);
+    if (pkt->seq) {
+        *hdr |= HDR_L1_SEQ;
+        *buf++ = pkt->_seq_num | (pkt->_req_ack << 7);
     }
 
     ret = cal_port_val(pkt->src_port, pkt->dst_port,
@@ -136,30 +138,27 @@ int cdnet_l1_from_frame(cdnet_intf_t *intf,
     pkt->len = 0;
     buf++; // skip hdr
 
-    pkt->is_multi_net = false;
-    pkt->is_multicast = false;
-    pkt->is_seq = false;
+    pkt->seq = !!(*hdr & HDR_L1_SEQ);
+    pkt->multi = (*hdr >> 4) & 3;
 
-    if (*hdr & HDR_L1_MULTI_NET) {
-        pkt->is_multi_net = true;
-        pkt->src_addr[0] = *buf++;
-        pkt->src_addr[1] = *buf++;
-        if (!(*hdr & HDR_L1_MULTICAST)) {
-            pkt->dst_addr[0] = *buf++;
-            pkt->dst_addr[1] = *buf++;
-        }
-    }
-    if (*hdr & HDR_L1_MULTICAST) {
-        pkt->is_multicast = true;
-        pkt->multicast_id = *buf++;
-        pkt->multicast_id |= *buf++ << 8;
+    switch (pkt->multi) {
+    case CDNET_MULTI_CAST_NET:
+    case CDNET_MULTI_NET:
+        pkt->src_addr.net = *buf++;
+        pkt->src_addr.mac = *buf++;
+        // no break
+    case CDNET_MULTI_CAST:
+        // multicast_id also copied
+        pkt->dst_addr.net = *buf++;
+        pkt->dst_addr.mac = *buf++;
+    default:
+        break;
     }
 
-    if (*hdr & HDR_L1_SEQ_NUM) {
-        pkt->is_seq = true;
-        pkt->seq_num = *buf++;
-        pkt->req_ack = !!(pkt->seq_num & 0x80);
-        pkt->seq_num &= 0x7f;
+    if (pkt->seq) {
+        pkt->_seq_num = *buf++;
+        pkt->_req_ack = !!(pkt->_seq_num & 0x80);
+        pkt->_seq_num &= 0x7f;
     }
 
     get_port_size(*hdr & 0x07, &src_port_size, &dst_port_size);

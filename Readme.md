@@ -13,7 +13,7 @@ CDNET is a high layer protocol for CDBUS
 
 CDNET protocol has three different levels, select by bit7 and bit6 of first byte:
 
-| bit7 | bit6   | DESCRIPTION                                                   |
+| Bit7 | Bit6   | DESCRIPTION                                                   |
 |------|------- |---------------------------------------------------------------|
 | 0    | x      | Level 0: The simplest one, for single network communication   |
 | 1    | 0      | Level 1: Support cross network and multi-cast communication   |
@@ -90,18 +90,18 @@ When communication with PC:
  - The `mac` is mapped to byte 16 of IPv6 Unique Local Address.
 
 ### SEQ_NO
-0: no sequence number;  
-1: append 1 byte sequence number, see [Port 0](#port-0).
+0: No sequence number;  
+1: Append 1 byte sequence number, see [Port 0](#port-0).
 
 
 ### PORT_SIZE:
 
-| bit2 | bit1 | bit0   | SRC_PORT      | DST_PORT      |
+| Bit2 | Bit1 | Bit0   | SRC_PORT      | DST_PORT      |
 |------|------|--------|---------------|---------------|
-| 0    | 0    | 0      | default port  | 1 byte        |
-| 0    | 0    | 1      | default port  | 2 bytes       |
-| 0    | 1    | 0      | 1 byte        | default port  |
-| 0    | 1    | 1      | 2 bytes       | default port  |
+| 0    | 0    | 0      | Default port  | 1 byte        |
+| 0    | 0    | 1      | Default port  | 2 bytes       |
+| 0    | 1    | 0      | 1 byte        | Default port  |
+| 0    | 1    | 1      | 2 bytes       | Default port  |
 | 1    | 0    | 0      | 1 byte        | 1 byte        |
 | 1    | 0    | 1      | 1 byte        | 2 bytes       |
 | 1    | 1    | 0      | 2 bytes       | 1 byte        |
@@ -119,23 +119,27 @@ First byte:
 |-------- |---------------------------------------------------| 
 | [7]     | Always 1                                          |
 | [6]     | Always 1                                          |
-| [5]     | FRAGMENT                                          |
-| [4]     | FRAGMENT_END                                      |
+| [5:4]   | FRAGMENT                                          |
 | [3]     | SEQ_NO                                            |
 | [2]     | COMPRESSED                                        |
 | [1:0]   | Reserved                                          |
 
-### FRAGMENT
-0: not fragment;  
-1: fragment packet, must select `SEQ_NO`.
+### FRAGMENT:
 
-### FRAGMENT_END:
-0: more fragments follow;  
-1: last fragment.
+| Bit5 | Bit4   | DST_PORT              |
+|------|--------|-----------------------|
+| 0    | 0      | Not fragment          |
+| 0    | 1      | First fragment        |
+| 1    | 0      | More fragment         |
+| 1    | 1      | Last fragment         |
+
+Note:
+ - `SEQ_NO` must be selected when using fragments.
+ - There is no need to reset the `SEQ_NO` number when starting the fragmentation.
 
 ### SEQ_NO
-0: no sequence number;  
-1: append 1 byte sequence number, see [Port 0](#port-0).
+0: No sequence number;  
+1: Append 1 byte sequence number, see [Port 0](#port-0).
 
 
 ## Specific Ports
@@ -169,7 +173,7 @@ Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 0 if wrong sequence detected and dro
 no return.
 ```
 
-Example: (Device A send packets to device B)
+Example: (device A send packets to device B)
 
 Device B maintain a `SEQ_NO` record list for each remote device, when the list is full, drop the oldest record.
 
@@ -206,7 +210,7 @@ Provide device info.
 
 Write `[]` (empty) to port 1: check `device_info` string,  
 Return `device_info` string: (any sequence, must contain at least model field)  
- - conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
+ - Conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
 
 Write `filter_string` to port 1: search device by string, (optional)  
 Return `device_info` string if `device_info` contain `filter_string`.
@@ -282,9 +286,9 @@ no return.
 ## Examples
 
 Request device info:
- - local network
- - request: `0x0c` -> `0x0d` (MAC address)
- - reply: `0x0d` -> `0x0c`
+ - Local network
+ - Request: `0x0c` -> `0x0d` (MAC address)
+ - Reply: `0x0d` -> `0x0c`
 
 Reply the device info string: `"M: c1; S: 1234"`,
 expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a, 0x20, 0x31, 0x32, 0x33, 0x34]`.
