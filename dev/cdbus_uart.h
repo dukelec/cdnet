@@ -26,10 +26,10 @@ typedef struct cduart_intf {
     list_head_t         rx_head;
     list_head_t         tx_head;
 
-    list_node_t         *rx_node;    // init: != NULL
+    cd_frame_t          *rx_frame;  // init: != NULL
     uint16_t            rx_byte_cnt;
     uint16_t            rx_crc;
-    uint32_t            t_last;      // last receive time
+    uint32_t            t_last;     // last receive time
 
     uint8_t             local_filter[8];
     uint8_t             remote_filter[8];

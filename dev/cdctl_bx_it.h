@@ -61,10 +61,10 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         uint8_t filter, uint32_t baud_l, uint32_t baud_h,
         spi_t *spi, gpio_t *rst_n, gpio_t *int_n);
 
-list_node_t *cdctl_get_free_node(cd_intf_t *cd_intf);
-list_node_t *cdctl_get_rx_node(cd_intf_t *cd_intf);
-void cdctl_put_free_node(cd_intf_t *cd_intf, list_node_t *node);
-void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node);
+cd_frame_t *cdctl_get_free_frame(cd_intf_t *cd_intf);
+cd_frame_t *cdctl_get_rx_frame(cd_intf_t *cd_intf);
+void cdctl_put_free_frame(cd_intf_t *cd_intf, cd_frame_t *frame);
+void cdctl_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame);
 
 void cdctl_int_isr(cdctl_intf_t *intf);
 void cdctl_spi_isr(cdctl_intf_t *intf);

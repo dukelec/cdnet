@@ -38,17 +38,14 @@ static int dbg_lost_cnt = 0;
 
 void _dprintf(char* format, ...)
 {
-    list_node_t *node;
-
-    node = list_get_irq_safe(&dbg_free);
-    if (node) {
-        dbg_node_t *buf = container_of(node, dbg_node_t, node);
+    dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
+    if (buf) {
         va_list arg;
         va_start (arg, format);
         // WARN: stack may not enough for reentrant
         buf->len = vsnprintf((char *)buf->data, LINE_LEN, format, arg);
         va_end (arg);
-        list_put_irq_safe(&dbg_tx, node);
+        list_put_it(&dbg_tx, &buf->node);
     } else {
         uint32_t flags;
         local_irq_save(flags);
@@ -59,14 +56,11 @@ void _dprintf(char* format, ...)
 
 void dputs(char *str)
 {
-    list_node_t *node;
-
-    node = list_get_irq_safe(&dbg_free);
-    if (node) {
-        dbg_node_t *buf = container_of(node, dbg_node_t, node);
+    dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
+    if (buf) {
         buf->len = strlen(str);
         memcpy(buf->data, str, buf->len);
-        list_put_irq_safe(&dbg_tx, node);
+        list_put_it(&dbg_tx, &buf->node);
     }
 }
 
@@ -99,7 +93,7 @@ void debug_flush(void)
         if (!uart_transmit_is_ready(&debug_uart))
             return;
         if (cur_buf)
-            list_put_irq_safe(&dbg_free, &cur_buf->node);
+            list_put_it(&dbg_free, &cur_buf->node);
 #endif
 
         if (dbg_lost_last != dbg_lost_cnt) {
@@ -107,16 +101,15 @@ void debug_flush(void)
             dbg_lost_last = dbg_lost_cnt;
         }
 
-        list_node_t *node = list_get_irq_safe(&dbg_tx);
-        if (!node)
+        dbg_node_t *buf = list_get_entry_it(&dbg_tx, dbg_node_t);
+        if (!buf)
             break;
-        dbg_node_t *buf = container_of(node, dbg_node_t, node);
 #ifdef DBG_TX_IT
         uart_transmit_it(&debug_uart, buf->data, buf->len);
         cur_buf = buf;
 #else
         uart_transmit(&debug_uart, buf->data, buf->len);
-        list_put_irq_safe(&dbg_free, node);
+        list_put_it(&dbg_free, &buf->node);
 #endif
     }
 }

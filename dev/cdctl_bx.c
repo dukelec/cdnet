@@ -54,28 +54,28 @@ static void cdctl_write_frame(cdctl_intf_t *intf, const cd_frame_t *frame)
 
 // member functions
 
-static list_node_t *cdctl_get_free_node(cd_intf_t *cd_intf)
+static cd_frame_t *cdctl_get_free_frame(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get(intf->free_head);
+    return list_get_entry(intf->free_head, cd_frame_t);
 }
 
-static list_node_t *cdctl_get_rx_node(cd_intf_t *cd_intf)
+static cd_frame_t *cdctl_get_rx_frame(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get(&intf->rx_head);
+    return list_get_entry(&intf->rx_head, cd_frame_t);
 }
 
-static void cdctl_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
+static void cdctl_put_free_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    list_put(intf->free_head, node);
+    list_put(intf->free_head, &frame->node);
 }
 
-static void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
+static void cdctl_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    list_put(&intf->tx_head, node);
+    list_put(&intf->tx_head, &frame->node);
 }
 
 static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
@@ -135,10 +135,10 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     if (!intf->name)
         intf->name = "cdctl";
     intf->free_head = free_head;
-    intf->cd_intf.get_free_node = cdctl_get_free_node;
-    intf->cd_intf.get_rx_node = cdctl_get_rx_node;
-    intf->cd_intf.put_free_node = cdctl_put_free_node;
-    intf->cd_intf.put_tx_node = cdctl_put_tx_node;
+    intf->cd_intf.get_free_frame = cdctl_get_free_frame;
+    intf->cd_intf.get_rx_frame = cdctl_get_rx_frame;
+    intf->cd_intf.put_free_frame = cdctl_put_free_frame;
+    intf->cd_intf.put_tx_frame = cdctl_put_tx_frame;
     intf->cd_intf.set_filter = cdctl_set_filter;
     intf->cd_intf.get_filter = cdctl_get_filter;
     intf->cd_intf.set_baud_rate = cdctl_set_baud_rate;
@@ -208,21 +208,19 @@ void cdctl_task(cdctl_intf_t *intf)
 
     if (flags & BIT_FLAG_RX_PENDING) {
         // if get free list: copy to rx list
-        list_node_t *node = list_get(intf->free_head);
-        if (node) {
+        cd_frame_t *frame = list_get_entry(intf->free_head, cd_frame_t);
+        if (frame) {
             dd_verbose(intf->name, "get_rx\n");
-            cd_frame_t *frame = container_of(node, cd_frame_t, node);
             cdctl_read_frame(intf, frame);
             cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_PENDING);
-            list_put(&intf->rx_head, node);
+            list_put(&intf->rx_head, &frame->node);
         } else {
-            dd_error(intf->name, "get_rx, no free node\n");
+            dd_error(intf->name, "get_rx, no free frame\n");
         }
     }
 
     if (!intf->is_pending && intf->tx_head.first) {
-        list_node_t *node = list_get(&intf->tx_head);
-        cd_frame_t *frame = container_of(node, cd_frame_t, node);
+        cd_frame_t *frame = list_get_entry(&intf->tx_head, cd_frame_t);
         dd_verbose(intf->name, "write frame\n");
         cdctl_write_frame(intf, frame);
 
@@ -234,7 +232,7 @@ void cdctl_task(cdctl_intf_t *intf)
             intf->is_pending = true;
             dd_verbose(intf->name, "pending\n");
         }
-        list_put(intf->free_head, node);
+        list_put(intf->free_head, &frame->node);
     }
 
     if (intf->is_pending) {

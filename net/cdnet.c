@@ -90,7 +90,6 @@ void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 
 void cdnet_rx(cdnet_intf_t *intf)
 {
-    list_node_t *cd_node, *net_node;
     cd_frame_t *frame;
     cdnet_packet_t *pkt;
     cd_intf_t *cd_intf = intf->cd_intf;
@@ -101,13 +100,10 @@ void cdnet_rx(cdnet_intf_t *intf)
         return;
     }
 
-    cd_node = cd_intf->get_rx_node(cd_intf);
-    if (!cd_node)
+    frame = cd_intf->get_rx_frame(cd_intf);
+    if (!frame)
         return;
-    frame = container_of(cd_node, cd_frame_t, node);
-
-    net_node = cdnet_list_get(intf->free_head);
-    pkt = container_of(net_node, cdnet_packet_t, node);
+    pkt = cdnet_packet_get(intf->free_head);
 
     if ((frame->dat[3] & 0xc0) == 0xc0)
         ret_val = cdnet_l2_from_frame(intf, frame->dat, pkt);
@@ -116,16 +112,16 @@ void cdnet_rx(cdnet_intf_t *intf)
     else
         ret_val = cdnet_l0_from_frame(intf, frame->dat, pkt);
 
-    cd_intf->put_free_node(cd_intf, cd_node);
+    cd_intf->put_free_frame(cd_intf, frame);
 
     if (ret_val != 0) {
         dd_error(intf->name, "rx: from_frame err\n");
-        cdnet_list_put(intf->free_head, net_node);
+        cdnet_list_put(intf->free_head, &pkt->node);
         return;
     }
     if (pkt->multi & CDNET_MULTI_CAST) {
         dd_error(intf->name, "rx: not support multicast yet\n");
-        cdnet_list_put(intf->free_head, net_node);
+        cdnet_list_put(intf->free_head, &pkt->node);
         return;
     }
 
@@ -145,7 +141,7 @@ void cdnet_rx(cdnet_intf_t *intf)
     }
 
     // send left pkt to upper layer directly
-    cdnet_list_put(&intf->rx_head, net_node);
+    cdnet_list_put(&intf->rx_head, &pkt->node);
 }
 
 void cdnet_tx(cdnet_intf_t *intf)

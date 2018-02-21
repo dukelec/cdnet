@@ -38,11 +38,11 @@
 #endif
 
 #ifdef CDNET_IRQ_SAFE
-#define cdnet_list_get          list_get_irq_safe
-#define cdnet_list_put          list_put_irq_safe
-#define cdnet_list_put_begin    list_put_begin_irq_safe
+#define cdnet_packet_get(head)  list_get_entry_it(head, cdnet_packet_t)
+#define cdnet_list_put          list_put_it
+#define cdnet_list_put_begin    list_put_begin_it
 #elif !defined(CDNET_USER_LIST)
-#define cdnet_list_get          list_get
+#define cdnet_packet_get(head)  list_get_entry(head, cdnet_packet_t)
 #define cdnet_list_put          list_put
 #define cdnet_list_put_begin    list_put_begin
 #endif
@@ -94,10 +94,10 @@ typedef struct {
 
 typedef struct cd_intf {
 
-    list_node_t *(* get_free_node)(struct cd_intf *cd_intf);
-    list_node_t *(* get_rx_node)(struct cd_intf *cd_intf);
-    void (* put_free_node)(struct cd_intf *cd_intf, list_node_t *node);
-    void (* put_tx_node)(struct cd_intf *cd_intf, list_node_t *node);
+    cd_frame_t *(* get_free_frame)(struct cd_intf *cd_intf);
+    cd_frame_t *(* get_rx_frame)(struct cd_intf *cd_intf);
+    void (* put_free_frame)(struct cd_intf *cd_intf, cd_frame_t *frame);
+    void (* put_tx_frame)(struct cd_intf *cd_intf, cd_frame_t *frame);
 
     // cdbus has two baud rates
     void  (* set_baud_rate)(struct cd_intf *intf, uint32_t, uint32_t);

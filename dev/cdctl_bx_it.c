@@ -11,8 +11,8 @@
 #include "cdctl_bx_it.h"
 #include "cdctl_bx_regs.h"
 
-#define CDCTL_MASK (BIT_FLAG_RX_PENDING | \
-            BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR | \
+#define CDCTL_MASK (BIT_FLAG_RX_PENDING |           \
+            BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
             BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
 
 
@@ -49,30 +49,30 @@ static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
 
 // member functions
 
-list_node_t *cdctl_get_free_node(cd_intf_t *cd_intf)
+cd_frame_t *cdctl_get_free_frame(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get_irq_safe(intf->free_head);
+    return list_get_entry_it(intf->free_head, cd_frame_t);
 }
 
-list_node_t *cdctl_get_rx_node(cd_intf_t *cd_intf)
+cd_frame_t *cdctl_get_rx_frame(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return list_get_irq_safe(&intf->rx_head);
+    return list_get_entry_it(&intf->rx_head, cd_frame_t);
 }
 
-void cdctl_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
+void cdctl_put_free_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    list_put_irq_safe(intf->free_head, node);
+    list_put_it(intf->free_head, &frame->node);
 }
 
-void cdctl_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
+void cdctl_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     uint32_t flags;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     local_irq_save(flags);
-    list_put(&intf->tx_head, node);
+    list_put(&intf->tx_head, &frame->node);
     if (intf->state == CDCTL_IDLE)
         cdctl_int_isr(intf);
     local_irq_restore(flags);
@@ -130,16 +130,14 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         uint8_t filter, uint32_t baud_l, uint32_t baud_h,
         spi_t *spi, gpio_t *rst_n, gpio_t *int_n)
 {
-    list_node_t *node = list_get(free_head);
-
     if (!intf->name)
         intf->name = "cdctl";
-    intf->rx_frame = container_of(node, cd_frame_t, node);
+    intf->rx_frame = list_get_entry(free_head, cd_frame_t);
     intf->free_head = free_head;
-    intf->cd_intf.get_free_node = cdctl_get_free_node;
-    intf->cd_intf.get_rx_node = cdctl_get_rx_node;
-    intf->cd_intf.put_free_node = cdctl_put_free_node;
-    intf->cd_intf.put_tx_node = cdctl_put_tx_node;
+    intf->cd_intf.get_free_frame = cdctl_get_free_frame;
+    intf->cd_intf.get_rx_frame = cdctl_get_rx_frame;
+    intf->cd_intf.put_free_frame = cdctl_put_free_frame;
+    intf->cd_intf.put_tx_frame = cdctl_put_tx_frame;
     intf->cd_intf.set_filter = cdctl_set_filter;
     intf->cd_intf.get_filter = cdctl_get_filter;
     intf->cd_intf.set_baud_rate = cdctl_set_baud_rate;
@@ -285,8 +283,7 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
                 return;
             }
         } else if (intf->tx_head.first) {
-            cd_frame_t *frame;
-            frame = container_of(intf->tx_head.first, cd_frame_t, node);
+            cd_frame_t *frame = list_entry(intf->tx_head.first, cd_frame_t);
             intf->buf[0] = REG_TX | 0x80;
             memcpy(intf->buf + 1, frame->dat, 3);
             intf->state = CDCTL_TX_HEADER;
@@ -332,10 +329,10 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     // end of CDCTL_RX_BODY
     if (intf->state == CDCTL_RX_BODY) {
         gpio_set_value(intf->spi->ns_pin, 1);
-        list_node_t *node = list_get_irq_safe(intf->free_head);
-        if (node) {
-            list_put_irq_safe(&intf->rx_head, &intf->rx_frame->node);
-            intf->rx_frame = container_of(node, cd_frame_t, node);
+        cd_frame_t *frame = list_get_entry_it(intf->free_head, cd_frame_t);
+        if (frame) {
+            list_put_it(&intf->rx_head, &intf->rx_frame->node);
+            intf->rx_frame = frame;
         } else {
             intf->rx_no_free_node_cnt++;
         }
@@ -346,7 +343,7 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
 
     // end of CDCTL_TX_HEADER
     if (intf->state == CDCTL_TX_HEADER) {
-        cd_frame_t *frame = container_of(intf->tx_head.first, cd_frame_t, node);
+        cd_frame_t *frame = list_entry(intf->tx_head.first, cd_frame_t);
         intf->state = CDCTL_TX_BODY;
         if (frame->dat[2] != 0) {
             spi_dma_write(intf->spi, frame->dat + 3, frame->dat[2]);
@@ -358,8 +355,7 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
     if (intf->state == CDCTL_TX_BODY) {
         gpio_set_value(intf->spi->ns_pin, 1);
 
-        list_node_t *node = list_get_irq_safe(&intf->tx_head);
-        list_put_irq_safe(intf->free_head, node);
+        list_put_it(intf->free_head, list_get_it(&intf->tx_head));
         intf->tx_wait_trigger = true;
 
         intf->state = CDCTL_RD_FLAG;

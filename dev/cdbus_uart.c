@@ -10,37 +10,37 @@
 #include "cdbus_uart.h"
 
 #ifdef CDUART_IRQ_SAFE
-#define cduart_list_get     list_get_irq_safe
-#define cduart_list_put     list_put_irq_safe
+#define cduart_frame_get(head)  list_get_entry_it(head, cd_frame_t)
+#define cduart_list_put         list_put_it
 #elif !defined(CDUART_USER_LIST)
-#define cduart_list_get     list_get
-#define cduart_list_put     list_put
+#define cduart_frame_get(head)  list_get_entry(head, cd_frame_t)
+#define cduart_list_put         list_put
 #endif
 
 // member functions
 
-static list_node_t *cduart_get_free_node(cd_intf_t *cd_intf)
+static cd_frame_t *cduart_get_free_frame(cd_intf_t *cd_intf)
 {
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    return cduart_list_get(intf->free_head);
+    return cduart_frame_get(intf->free_head);
 }
 
-static list_node_t *cduart_get_rx_node(cd_intf_t *cd_intf)
+static cd_frame_t *cduart_get_rx_frame(cd_intf_t *cd_intf)
 {
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    return cduart_list_get(&intf->rx_head);
+    return cduart_frame_get(&intf->rx_head);
 }
 
-static void cduart_put_free_node(cd_intf_t *cd_intf, list_node_t *node)
+static void cduart_put_free_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_list_put(intf->free_head, node);
+    cduart_list_put(intf->free_head, &frame->node);
 }
 
-static void cduart_put_tx_node(cd_intf_t *cd_intf, list_node_t *node)
+static void cduart_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 {
     cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_list_put(&intf->tx_head, node);
+    cduart_list_put(&intf->tx_head, &frame->node);
 }
 
 
@@ -48,14 +48,12 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head)
 {
     if (!intf->name)
         intf->name = "cduart";
+    intf->rx_frame = list_get_entry(free_head, cd_frame_t);
     intf->free_head = free_head;
-
-    intf->cd_intf.get_free_node = cduart_get_free_node;
-    intf->cd_intf.get_rx_node = cduart_get_rx_node;
-    intf->cd_intf.put_free_node = cduart_put_free_node;
-    intf->cd_intf.put_tx_node = cduart_put_tx_node;
-
-    intf->rx_node = list_get(free_head);
+    intf->cd_intf.get_free_frame = cduart_get_free_frame;
+    intf->cd_intf.get_rx_frame = cduart_get_rx_frame;
+    intf->cd_intf.put_free_frame = cduart_put_free_frame;
+    intf->cd_intf.put_tx_frame = cduart_put_tx_frame;
 
     intf->t_last = get_systick();
     intf->rx_crc = 0xffff;
@@ -110,7 +108,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
     const uint8_t *rd = buf;
 
     while (true) {
-        cd_frame_t *frame = container_of(intf->rx_node, cd_frame_t, node);
+        cd_frame_t *frame = intf->rx_frame;
 
         if (!len || rd == buf + len)
             return;
@@ -152,12 +150,12 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
             if (intf->rx_crc != 0) {
                 dd_error(intf->name, "crc error\n");
             } else {
-                list_node_t *node = cduart_list_get(intf->free_head);
-                if (node != NULL) {
+                cd_frame_t *frm = cduart_frame_get(intf->free_head);
+                if (frm) {
                     dd_verbose(intf->name, "rx [%02x, %02x, %02x ...]\n",
                             frame->dat[0], frame->dat[1], frame->dat[2]);
-                    cduart_list_put(&intf->rx_head, intf->rx_node);
-                    intf->rx_node = node;
+                    cduart_list_put(&intf->rx_head, &intf->rx_frame->node);
+                    intf->rx_frame = frm;
                 } else {
                     // set rx_lost flag
                     dd_error(intf->name, "rx_lost\n");
