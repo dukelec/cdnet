@@ -121,8 +121,7 @@ First byte:
 | [6]     | Always 1                                          |
 | [5:4]   | FRAGMENT                                          |
 | [3]     | SEQ_NO                                            |
-| [2]     | COMPRESSED                                        |
-| [1:0]   | Reserved                                          |
+| [2:0]   | User-defined flag                                 |
 
 ### FRAGMENT:
 

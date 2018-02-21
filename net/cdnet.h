@@ -75,11 +75,7 @@ typedef enum {
 #define HDR_L0_REPLY    (1 << 6)
 #define HDR_L0_SHARE    (1 << 5)
 
-#define HDR_L1_SEQ      (1 << 3)
-
-#define HDR_L2_SEQ      (1 << 3)
-#define HDR_L2_COMPR    (1 << 2)
-
+#define HDR_L1_L2_SEQ   (1 << 3)
 
 #define ERR_ASSERT      -1
 
@@ -147,7 +143,7 @@ typedef struct {
 
     // level 2 only
     cdnet_frag_t    frag;
-    bool            compr;
+    uint8_t         l2_flag;
 
     int             len;
     uint8_t         dat[CDNET_DAT_SIZE];

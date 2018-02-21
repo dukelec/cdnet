@@ -95,7 +95,7 @@ int cdnet_l1_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
     }
 
     if (pkt->seq) {
-        *hdr |= HDR_L1_SEQ;
+        *hdr |= HDR_L1_L2_SEQ;
         *buf++ = pkt->_seq_num | (pkt->_req_ack << 7);
     }
 
@@ -138,7 +138,7 @@ int cdnet_l1_from_frame(cdnet_intf_t *intf,
     pkt->len = 0;
     buf++; // skip hdr
 
-    pkt->seq = !!(*hdr & HDR_L1_SEQ);
+    pkt->seq = !!(*hdr & HDR_L1_L2_SEQ);
     pkt->multi = (*hdr >> 4) & 3;
 
     switch (pkt->multi) {

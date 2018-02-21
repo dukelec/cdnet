@@ -23,24 +23,21 @@ int cdnet_l2_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
     uint8_t *hdr = buf + 3;
 
     assert(pkt->level == CDNET_L2);
+    assert(pkt->l2_flag <= 7);
 
     // CDBUS frame header: [src, dst, len]
     *buf++ = pkt->src_mac;
     *buf++ = pkt->dst_mac;
     buf++; // fill at end
-
-    *buf++ = HDR_L1_L2 | HDR_L2; // hdr
+    *buf++ = HDR_L1_L2 | HDR_L2 | pkt->l2_flag; // hdr
 
     if (pkt->frag) {
         assert(pkt->seq);
         *hdr |= pkt->frag << 4;
     }
 
-    if (pkt->compr)
-        *hdr |= HDR_L2_COMPR;
-
     if (pkt->seq) {
-        *hdr |= HDR_L2_SEQ;
+        *hdr |= HDR_L1_L2_SEQ;
         *buf++ = pkt->_seq_num | (pkt->_req_ack << 7);
     }
 
@@ -58,13 +55,12 @@ int cdnet_l2_from_frame(cdnet_intf_t *intf,
 
     assert((*hdr & 0xc0) == 0xc0);
     pkt->level = CDNET_L2;
-    pkt->seq = !!(*hdr & HDR_L2_SEQ);
+    pkt->seq = !!(*hdr & HDR_L1_L2_SEQ);
 
     pkt->src_mac = *buf++;
     pkt->dst_mac = *buf++;
     tmp_len = *buf++;
-
-    buf++; // skip hdr
+    pkt->l2_flag = *buf++ & 7; // hdr
 
     if (*hdr & 0x30) {
         assert(pkt->seq);
@@ -72,8 +68,6 @@ int cdnet_l2_from_frame(cdnet_intf_t *intf,
     } else {
         pkt->frag = CDNET_FRAG_NONE;
     }
-
-    pkt->compr = !!(*hdr & HDR_L2_COMPR);
 
     if (pkt->seq) {
         pkt->_seq_num = *buf++;
