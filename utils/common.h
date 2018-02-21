@@ -35,18 +35,33 @@
     ((type *)((char *)(ptr) - offsetof(type, member)))
 #endif
 
-// avoid something like: max(i++, j++), max(min(a, b), c) ...
 #ifndef sign
-#define sign(a) (((a) < 0) ? -1 : ((a) > 0))
+#define sign(a) ({                          \
+        typeof(a) _a = (a);                 \
+        _a < 0 ? -1 : (_a > 0);             \
+    })
 #endif
 #ifndef max
-#define max(a, b) ((a) > (b) ? (a) : (b))
+#define max(a, b) ({                        \
+        typeof(a) _a = (a);                 \
+        typeof(b) _b = (b);                 \
+        _a > _b ? _a : _b;                  \
+    })
 #endif
 #ifndef min
-#define min(a, b) ((a) < (b) ? (a) : (b))
+#define min(a, b) ({                        \
+        typeof(a) _a = (a);                 \
+        typeof(b) _b = (b);                 \
+        _a < _b ? _a : _b;                  \
+    })
 #endif
 #ifndef clip
-#define clip(a, b, c) ((a) < (b) ? (b) : ((a) > (c) ? (c) : (a)))
+#define clip(a, b, c) ({                    \
+        typeof(a) _a = (a);                 \
+        typeof(b) _b = (b);                 \
+        typeof(c) _c = (c);                 \
+        _a < _b ? _b : (_a > _c ? _c : _a); \
+    })
 #endif
 
 

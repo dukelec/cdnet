@@ -37,8 +37,8 @@ int list_len(list_head_t *head);
     container_of(ptr, type, node)
 
 #define list_entry_safe(ptr, type) ({                   \
-        list_node_t *ptr__ = (ptr);                     \
-        ptr__ ? container_of(ptr__, type, node) : NULL; \
+        list_node_t *_ptr = (ptr);                      \
+        _ptr ? container_of(_ptr, type, node) : NULL;   \
     })
 
 #define list_get_entry(head, type)                      \
