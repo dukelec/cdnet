@@ -95,53 +95,55 @@ void cdnet_rx(cdnet_intf_t *intf)
     cd_intf_t *cd_intf = intf->cd_intf;
     int ret_val;
 
-    if (!intf->free_head->first) {
-        dd_warn(intf->name, "rx: no free pkt\n");
-        return;
-    }
+    while (true) {
+        if (!intf->free_head->first) {
+            dd_warn(intf->name, "rx: no free pkt\n");
+            return;
+        }
 
-    frame = cd_intf->get_rx_frame(cd_intf);
-    if (!frame)
-        return;
-    pkt = cdnet_packet_get(intf->free_head);
+        frame = cd_intf->get_rx_frame(cd_intf);
+        if (!frame)
+            return;
+        pkt = cdnet_packet_get(intf->free_head);
 
-    if ((frame->dat[3] & 0xc0) == 0xc0)
-        ret_val = cdnet_l2_from_frame(intf, frame->dat, pkt);
-    else if (frame->dat[3] & 0x80)
-        ret_val = cdnet_l1_from_frame(intf, frame->dat, pkt);
-    else
-        ret_val = cdnet_l0_from_frame(intf, frame->dat, pkt);
+        if ((frame->dat[3] & 0xc0) == 0xc0)
+            ret_val = cdnet_l2_from_frame(intf, frame->dat, pkt);
+        else if (frame->dat[3] & 0x80)
+            ret_val = cdnet_l1_from_frame(intf, frame->dat, pkt);
+        else
+            ret_val = cdnet_l0_from_frame(intf, frame->dat, pkt);
 
-    cd_intf->put_free_frame(cd_intf, frame);
+        cd_intf->put_free_frame(cd_intf, frame);
 
-    if (ret_val != 0) {
-        dd_error(intf->name, "rx: from_frame err\n");
-        cdnet_list_put(intf->free_head, &pkt->node);
-        return;
-    }
-    if (pkt->multi & CDNET_MULTI_CAST) {
-        dd_error(intf->name, "rx: not support multicast yet\n");
-        cdnet_list_put(intf->free_head, &pkt->node);
-        return;
-    }
+        if (ret_val != 0) {
+            dd_error(intf->name, "rx: from_frame err\n");
+            cdnet_list_put(intf->free_head, &pkt->node);
+            return;
+        }
+        if (pkt->multi & CDNET_MULTI_CAST) {
+            dd_error(intf->name, "rx: not support multicast yet\n");
+            cdnet_list_put(intf->free_head, &pkt->node);
+            return;
+        }
 
-    if (pkt->level != CDNET_L2 && pkt->dst_port == 0 &&
-            pkt->src_port >= CDNET_DEF_PORT) {
-        cdnet_p0_request_handle(intf, pkt);
-        return;
-    }
-    if (pkt->level != CDNET_L2 && pkt->src_port == 0 &&
-            pkt->dst_port == CDNET_DEF_PORT) {
-        cdnet_p0_reply_handle(intf, pkt);
-        return;
-    }
-    if (pkt->level != CDNET_L0 && pkt->seq) {
-        cdnet_seq_rx_handle(intf, pkt);
-        return;
-    }
+        if (pkt->level != CDNET_L2 && pkt->dst_port == 0 &&
+                pkt->src_port >= CDNET_DEF_PORT) {
+            cdnet_p0_request_handle(intf, pkt);
+            return;
+        }
+        if (pkt->level != CDNET_L2 && pkt->src_port == 0 &&
+                pkt->dst_port == CDNET_DEF_PORT) {
+            cdnet_p0_reply_handle(intf, pkt);
+            return;
+        }
+        if (pkt->level != CDNET_L0 && pkt->seq) {
+            cdnet_seq_rx_handle(intf, pkt);
+            return;
+        }
 
-    // send left pkt to upper layer directly
-    cdnet_list_put(&intf->rx_head, &pkt->node);
+        // send left pkt to upper layer directly
+        cdnet_list_put(&intf->rx_head, &pkt->node);
+    }
 }
 
 void cdnet_tx(cdnet_intf_t *intf)

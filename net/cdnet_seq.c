@@ -45,8 +45,8 @@ void cdnet_seq_init(cdnet_intf_t *intf)
 #ifdef USE_DYNAMIC_INIT
         list_head_init(&rec->wait_head);
         list_head_init(&rec->pend_head);
-        rec->pend_cnt = 0;
         rec->send_cnt = 0;
+        rec->p0_retry_cnt = 0;
         rec->p0_req = NULL;
         rec->p0_ans = NULL;
         rec->p0_ack = NULL;
@@ -172,7 +172,7 @@ static void cdnet_p0_service(cdnet_intf_t *intf, cdnet_packet_t *pkt)
                 r->addr.net = 255;
             }
             r->seq_num = pkt->dat[1];
-            dd_debug(intf->name, "p0_rx: add seq rec: %d\n", r->seq_num);
+            dd_debug(intf->name, "p0_rx: pick seq rec: %d\n", r->seq_num);
             list_put_begin(&intf->seq_rx_head, &r->node);
         }
         pkt->len = 0;
@@ -294,11 +294,14 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
 
     // distribute all items from intf->tx_head to each tx_rec
     while (true) {
+        seq_tx_rec_t *rec = NULL;
         cdnet_packet_t *pkt = cdnet_packet_get(&intf->tx_head);
         if (!pkt)
             break;
         if (pkt->level == CDNET_L0)
             pkt->seq = false;
+        if (pkt->level != CDNET_L1)
+            pkt->multi = CDNET_MULTI_NONE;
         if (pkt->seq && pkt->dst_mac == 255) {
             pkt->seq = false;
             dd_warn(intf->name, "tx: not support seq for broadcast yet\n");
@@ -307,6 +310,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         list_for_each(&intf->seq_tx_head, pre, cur) {
             seq_tx_rec_t *r = list_entry(cur, seq_tx_rec_t);
             if (is_tx_rec_match(r, pkt)) {
+                rec = r;
                 if (pkt->seq || is_tx_rec_inuse(r)) {
                     list_put(&r->wait_head, &pkt->node);
                     pkt = NULL;
@@ -317,32 +321,31 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         }
         if (!pkt)
             continue;
-
         if (!pkt->seq) {
             list_put(&intf->seq_tx_direct_head, &pkt->node);
             continue;
         }
-
-        // pick the oldest rec if not in use
-        seq_tx_rec_t *r = list_entry(intf->seq_tx_head.last, seq_tx_rec_t);
-        if (is_tx_rec_inuse(r)) {
-            dd_warn(intf->name, "tx: no free rec\n");
-            cdnet_list_put_begin(&intf->tx_head, &pkt->node);
-            break;
+        if (!rec)  {
+            // pick the oldest rec if not in use
+            rec = list_entry(intf->seq_tx_head.last, seq_tx_rec_t);
+            if (is_tx_rec_inuse(rec)) {
+                dd_warn(intf->name, "tx: no free rec\n");
+                cdnet_list_put_begin(&intf->tx_head, &pkt->node);
+                break;
+            }
+            list_node_t *node = list_get_last(&intf->seq_tx_head);
+            memset(rec, 0, sizeof(*rec));
+            list_put_begin(&intf->seq_tx_head, node);
+            if (pkt->multi) {
+                rec->addr = pkt->dst_addr;
+            } else {
+                rec->addr.mac = pkt->dst_mac;
+                rec->addr.net = 255;
+            }
+            rec->seq_num = 0x80;
+            dd_debug(intf->name, "tx: pick seq rec\n");
         }
-        list_put_begin(&intf->seq_tx_head, list_get_last(&intf->seq_tx_head));
-        if (pkt->multi) {
-            r->addr = pkt->dst_addr;
-        } else {
-            r->addr.mac = pkt->dst_mac;
-            r->addr.net = 255;
-        }
-        r->seq_num = 0x80;
-        list_head_init(&r->wait_head);
-        list_head_init(&r->pend_head);
-        r->pend_cnt = 0;
-        r->send_cnt = 0;
-        list_put(&r->wait_head, &pkt->node);
+        list_put(&rec->wait_head, &pkt->node);
     }
 
     // send packets form seq_tx_direct_head
@@ -378,7 +381,6 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                         break;
                     list_get(&r->pend_head);
                     cdnet_list_put(intf->free_head, c);
-                    r->pend_cnt--;
                     c = p;
                 }
                 // re-send left
@@ -399,7 +401,6 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                         cdnet_list_put(intf->free_head, c);
                         c = p;
                     }
-                    r->pend_cnt = 0;
                 }
             }
 
@@ -407,6 +408,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
             cdnet_list_put(intf->free_head, &r->p0_ans->node);
             r->p0_req = NULL;
             r->p0_ans = NULL;
+            r->p0_retry_cnt = 0;
         }
         if (r->p0_ack) {
             list_for_each(&r->pend_head, p, c) {
@@ -415,7 +417,6 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                     break;
                 list_get(&r->pend_head);
                 cdnet_list_put(intf->free_head, c);
-                r->pend_cnt--;
                 c = p;
             }
             cdnet_list_put(intf->free_head, &r->p0_ack->node);
@@ -426,14 +427,27 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
             if (get_systick() - r->p0_req->_send_time > SEQ_TIMEOUT) {
                 dd_warn(intf->name, "tx: p0_req timeout, len: %d\n",
                         r->p0_req->len);
-                // TODO: limit retry counts
-                if (cdnet_send_pkt(intf, r->p0_req) == 0)
+                if (r->p0_retry_cnt > SEQ_TX_RETRY_MAX) {
+                    dd_error(intf->name, "tx: reach retry_max\n");
+                    while (r->pend_head.first)
+                        cdnet_list_put(intf->free_head, list_get(&r->pend_head));
+                    while (r->wait_head.first)
+                        cdnet_list_put(intf->free_head, list_get(&r->wait_head));
+                    cdnet_list_put(intf->free_head, &r->p0_req->node);
+                    r->p0_req = NULL;
+                    r->p0_retry_cnt = 0;
+                    r->seq_num = 0x80;
+                    continue;
+                }
+                if (cdnet_send_pkt(intf, r->p0_req) == 0) {
                     r->p0_req->_send_time = get_systick();
+                    r->p0_retry_cnt++;
+                }
             }
             continue;
         }
 
-        if (r->seq_num & 0x80) {
+        if ((r->pend_head.first || r->wait_head.first) && r->seq_num & 0x80) {
             r->p0_req = cdnet_packet_get(intf->free_head);
             if (!r->p0_req) {
                 dd_error(intf->name, "tx: set_seq: no free pkt\n");
@@ -486,7 +500,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
             int ret;
             cdnet_packet_t *pkt = list_entry(c, cdnet_packet_t);
 
-            if (r->pend_cnt > SEQ_TX_PEND_MAX)
+            if (r->pend_head.len > SEQ_TX_PEND_MAX)
                 break;
             if (pkt->seq) {
                 pkt->_seq_num = r->seq_num;
@@ -505,7 +519,6 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                 r->seq_num = (r->seq_num + 1) & 0x7f;
                 pkt->_send_time = get_systick();
                 list_put(&r->pend_head, c);
-                r->pend_cnt++;
             } else {
                 if (ret != 0)
                     dd_error(intf->name, "tx: send wait_head error\n");

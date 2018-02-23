@@ -29,6 +29,9 @@
 #ifndef SEQ_TX_ACK_CNT
 #define SEQ_TX_ACK_CNT      3
 #endif
+#ifndef SEQ_TX_RETRY_MAX
+#define SEQ_TX_RETRY_MAX    3
+#endif
 #ifndef SEQ_TX_PEND_MAX
 #define SEQ_TX_PEND_MAX     6
 #endif
@@ -164,8 +167,8 @@ typedef struct {
     // for tx only
     list_head_t     wait_head;
     list_head_t     pend_head;
-    uint8_t         pend_cnt; // items in pend_head, for SEQ_TX_PEND_MAX
     uint8_t         send_cnt; // send ack for each SEQ_TX_ACK_CNT
+    uint8_t         p0_retry_cnt;
     cdnet_packet_t  *p0_req;
     cdnet_packet_t  *p0_ans;
     cdnet_packet_t  *p0_ack;
