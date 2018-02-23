@@ -13,12 +13,11 @@
 list_node_t *list_get(list_head_t *head)
 {
     list_node_t *node = NULL;
-    if (head->first != NULL) {
+    if (head->len) {
         node = head->first;
         head->first = node->next;
-        if (!node->next)
+        if (--head->len == 0)
             head->last = NULL;
-        node->next = NULL;
     }
     return node;
 }
@@ -26,7 +25,7 @@ list_node_t *list_get(list_head_t *head)
 // append item at end
 void list_put(list_head_t *head, list_node_t *node)
 {
-    if (head->last)
+    if (head->len++)
         head->last->next = node;
     else
         head->first = node;
@@ -53,6 +52,7 @@ list_node_t *list_get_last(list_head_t *head)
     } else {
         head->first = head->last = NULL;
     }
+    head->len--;
 
     return node;
 }
@@ -61,7 +61,7 @@ void list_put_begin(list_head_t *head, list_node_t *node)
 {
     node->next = head->first;
     head->first = node;
-    if (!head->last)
+    if (!head->len++)
         head->last = node;
 }
 
@@ -71,9 +71,8 @@ void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node)
         pre->next = node->next;
     else
         head->first = node->next;
-    if (!node->next)
+    if (--head->len == 0)
         head->last = NULL;
-    node->next = NULL;
 }
 
 void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node)
@@ -89,7 +88,7 @@ void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node)
         head->last = pre;
 }
 
-int list_len(list_head_t *head)
+int list_len_check(list_head_t *head)
 {
     int ret_val = 0;
     list_node_t *node = head->first;

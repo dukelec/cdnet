@@ -20,6 +20,7 @@ typedef struct list_node {
 typedef struct {
     list_node_t *first;
     list_node_t *last;
+    size_t      len;
 } list_head_t;
 
 
@@ -30,7 +31,6 @@ list_node_t *list_get_last(list_head_t *head);
 void list_put_begin(list_head_t *head, list_node_t *node);
 void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node);
 void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
-int list_len(list_head_t *head);
 
 
 #define list_entry(ptr, type)                           \
@@ -51,12 +51,9 @@ int list_len(list_head_t *head);
     for (pre = NULL, pos = (head)->first; pos != NULL;  \
          pre = pos, pos = pos ? (pos)->next : NULL)
 
+#define list_head_init(head)                            \
+    memset(head, 0, sizeof(list_head_t))
 
-static inline void list_head_init(list_head_t *head)
-{
-    head->first = NULL;
-    head->last = NULL;
-}
 
 static inline list_node_t *list_get_it(list_head_t *head)
 {
