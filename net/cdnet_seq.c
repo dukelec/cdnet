@@ -413,7 +413,7 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
         if (r->p0_ack) {
             list_for_each(&r->pend_head, p, c) {
                 cdnet_packet_t *pkt = list_entry(c, cdnet_packet_t);
-                if (pkt->_seq_num == r->p0_ack->dat[1])
+                if (pkt->_seq_num == r->p0_ack->dat[2])
                     break;
                 list_get(&r->pend_head);
                 cdnet_list_put(intf->free_head, c);

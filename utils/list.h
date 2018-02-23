@@ -33,25 +33,28 @@ void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node);
 void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
 
 
-#define list_entry(ptr, type)                           \
+#define list_entry(ptr, type)                                   \
     container_of(ptr, type, node)
 
-#define list_entry_safe(ptr, type) ({                   \
-        list_node_t *_ptr = (ptr);                      \
-        _ptr ? container_of(_ptr, type, node) : NULL;   \
+#define list_entry_safe(ptr, type) ({                           \
+        list_node_t *_ptr = (ptr);                              \
+        _ptr ? container_of(_ptr, type, node) : NULL;           \
     })
 
-#define list_get_entry(head, type)                      \
+#define list_get_entry(head, type)                              \
         list_entry_safe(list_get(head), type)
 
-#define list_get_entry_it(head, type)                   \
+#define list_get_entry_it(head, type)                           \
         list_entry_safe(list_get_it(head), type)
 
-#define list_for_each(head, pre, pos)                   \
-    for (pre = NULL, pos = (head)->first; pos != NULL;  \
-         pre = pos, pos = pos ? (pos)->next : NULL)
+#define list_for_each(head, pre, pos)                           \
+    for (pre = NULL, pos = (head)->first; pos != NULL;          \
+         pre = pos, pos = (pos ? (pos)->next : (head)->first))
+// you can remove a node during the loop:
+//      list_pick(head, pre, pos);
+//      pos = pre;
 
-#define list_head_init(head)                            \
+#define list_head_init(head)                                    \
     memset(head, 0, sizeof(list_head_t))
 
 
