@@ -23,7 +23,8 @@ int cdnet_l2_to_frame(cdnet_intf_t *intf, cdnet_packet_t *pkt, uint8_t *buf)
     uint8_t *hdr = buf + 3;
 
     assert(pkt->level == CDNET_L2);
-    assert(pkt->l2_flag <= 7);
+    assert((pkt->l2_flag & ~7) == 0);
+    assert((pkt->frag & ~3) == 0);
 
     // CDBUS frame header: [src, dst, len]
     *buf++ = pkt->src_mac;
