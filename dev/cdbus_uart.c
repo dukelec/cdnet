@@ -152,8 +152,11 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
             } else {
                 cd_frame_t *frm = cduart_frame_get(intf->free_head);
                 if (frm) {
-                    dd_verbose(intf->name, "rx [%02x, %02x, %02x ...]\n",
-                            frame->dat[0], frame->dat[1], frame->dat[2]);
+#ifdef VERBOSE
+                    char pbuf[52];
+                    hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+                    dd_verbose(intf->name, "rx [%s]\n", pbuf);
+#endif
                     cduart_list_put(&intf->rx_head, &intf->rx_frame->node);
                     intf->rx_frame = frm;
                 } else {

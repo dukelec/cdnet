@@ -61,6 +61,11 @@ void dputs(char *str)
         buf->len = strlen(str);
         memcpy(buf->data, str, buf->len);
         list_put_it(&dbg_tx, &buf->node);
+    } else {
+        uint32_t flags;
+        local_irq_save(flags);
+        dbg_lost_cnt++;
+        local_irq_restore(flags);
     }
 }
 

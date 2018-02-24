@@ -37,8 +37,8 @@ void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
     container_of(ptr, type, node)
 
 #define list_entry_safe(ptr, type) ({                           \
-        list_node_t *_ptr = (ptr);                              \
-        _ptr ? container_of(_ptr, type, node) : NULL;           \
+        list_node_t *__ptr = (ptr);                             \
+        __ptr ? container_of(__ptr, type, node) : NULL;         \
     })
 
 #define list_get_entry(head, type)                              \

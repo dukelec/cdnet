@@ -51,32 +51,21 @@ void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
 
 void cdnet_exchg_src_dst(cdnet_intf_t *intf, cdnet_packet_t *pkt)
 {
-    cdnet_addr_t tmp_addr;
-    uint8_t tmp_mac;
-    uint16_t tmp_port;
-
-    tmp_mac = pkt->src_mac;
-    pkt->src_mac = pkt->dst_mac;
-    pkt->dst_mac = tmp_mac;
+    swap(pkt->src_mac, pkt->dst_mac);
 
     if (pkt->src_mac == 255)
         pkt->src_mac = intf->addr.mac;
 
     if (pkt->level == CDNET_L1 && pkt->multi) {
-        tmp_addr = pkt->src_addr;
-        pkt->src_addr = pkt->dst_addr;
-        pkt->dst_addr = tmp_addr;
+        swap(pkt->src_addr, pkt->dst_addr);
         if (pkt->multi & CDNET_MULTI_CAST) {
             pkt->multi &= (~CDNET_MULTI_CAST) & 3;
             pkt->src_addr = intf->addr;
         }
     }
 
-    if (pkt->level != CDNET_L2) {
-        tmp_port = pkt->src_port;
-        pkt->src_port = pkt->dst_port;
-        pkt->dst_port = tmp_port;
-    }
+    if (pkt->level != CDNET_L2)
+        swap(pkt->src_port, pkt->dst_port);
 }
 
 void cdnet_fill_src_addr(cdnet_intf_t *intf, cdnet_packet_t *pkt)

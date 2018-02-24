@@ -30,3 +30,8 @@ void _dprintf(char* format, ...)
     vprintf (format, args);
     va_end (args);
 }
+
+void dputs(char *str)
+{
+    fputs(str, stdout);
+}

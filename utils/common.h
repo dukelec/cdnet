@@ -36,32 +36,36 @@
 #endif
 
 #ifndef sign
-#define sign(a) ({                          \
-        typeof(a) _a = (a);                 \
-        _a < 0 ? -1 : (_a > 0);             \
+#define sign(a) ({                  \
+        typeof(a) __a = (a);        \
+        __a < 0 ? -1 : (__a > 0);   \
     })
 #endif
 #ifndef max
-#define max(a, b) ({                        \
-        typeof(a) _a = (a);                 \
-        typeof(b) _b = (b);                 \
-        _a > _b ? _a : _b;                  \
+#define max(a, b) ({                \
+        typeof(a) __a = (a);        \
+        typeof(b) __b = (b);        \
+        __a > __b ? __a : __b;      \
     })
 #endif
 #ifndef min
-#define min(a, b) ({                        \
-        typeof(a) _a = (a);                 \
-        typeof(b) _b = (b);                 \
-        _a < _b ? _a : _b;                  \
+#define min(a, b) ({                \
+        typeof(a) __a = (a);        \
+        typeof(b) __b = (b);        \
+        __a < __b ? __a : __b;      \
     })
 #endif
 #ifndef clip
-#define clip(a, b, c) ({                    \
-        typeof(a) _a = (a);                 \
-        typeof(b) _b = (b);                 \
-        typeof(c) _c = (c);                 \
-        _a < _b ? _b : (_a > _c ? _c : _a); \
+#define clip(a, b, c) ({                            \
+        typeof(a) __a = (a);                        \
+        typeof(b) __b = (b);                        \
+        typeof(c) __c = (c);                        \
+        __a < __b ? __b : (__a > __c ? __c : __a);  \
     })
+#endif
+#ifndef swap
+#define swap(a, b) \
+    do { typeof(a) __tmp = (a); (a) = (b); (b) = __tmp; } while (0)
 #endif
 
 
@@ -102,6 +106,9 @@ void dputs(char *str);
 void dhtoa(uint32_t val, char *buf);
 void debug_init(void);
 void debug_flush(void);
+
+void hex_dump_small(char *pbuf, const void *addr, int len, int max);
+void hex_dump(const void *addr, int len);
 #endif // OVERRIDE_DEBUG
 
 #endif
