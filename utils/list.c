@@ -9,6 +9,11 @@
 
 #include "list.h"
 
+#ifdef LIST_DEBUG
+#include <unwind.h>
+static void list_check(list_head_t *head);
+#endif
+
 // pick first item
 list_node_t *list_get(list_head_t *head)
 {
@@ -19,6 +24,9 @@ list_node_t *list_get(list_head_t *head)
         if (--head->len == 0)
             head->last = NULL;
     }
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
     return node;
 }
 
@@ -31,6 +39,9 @@ void list_put(list_head_t *head, list_node_t *node)
         head->first = node;
     head->last = node;
     node->next = NULL;
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
 }
 
 list_node_t *list_get_last(list_head_t *head)
@@ -54,6 +65,9 @@ list_node_t *list_get_last(list_head_t *head)
     }
     head->len--;
 
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
     return node;
 }
 
@@ -63,6 +77,9 @@ void list_put_begin(list_head_t *head, list_node_t *node)
     head->first = node;
     if (!head->len++)
         head->last = node;
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
 }
 
 void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node)
@@ -73,6 +90,9 @@ void list_pick(list_head_t *head, list_node_t *pre, list_node_t *node)
         head->first = node->next;
     if (--head->len == 0)
         head->last = NULL;
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
 }
 
 void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node)
@@ -86,15 +106,41 @@ void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node)
 
     if (head->last == node)
         head->last = pre;
+#ifdef LIST_DEBUG
+    list_check(head);
+#endif
 }
 
-int list_len_check(list_head_t *head)
+
+#ifdef LIST_DEBUG
+static _Unwind_Reason_Code trace_fcn(_Unwind_Context *ctx, void *_)
 {
-    int ret_val = 0;
-    list_node_t *node = head->first;
-    while (node) {
-        ret_val++;
-        node = node->next;
-    }
-    return ret_val;
+    printf("bt: [%08x]\n", _Unwind_GetIP(ctx));
+    return _URC_NO_REASON;
 }
+
+static void list_check(list_head_t *head)
+{
+    int len = 0;
+    list_node_t *node = head->first;
+    list_node_t *pre = NULL;
+
+    while (node) {
+        pre = node;
+        node = node->next;
+        len++;
+    }
+
+    if (head->len != len) {
+        printf("PANIC: list %p, wrong len: %d, %d\n", head, head->len, len);
+        _Unwind_Backtrace(&trace_fcn, NULL);
+        while (true);
+    }
+    if (head->last != pre) {
+        printf("PANIC: list %p, wrong head->last: %p, %p, len: %d, %d\n",
+                head, head->last, node, head->len, len);
+        _Unwind_Backtrace(&trace_fcn, NULL);
+        while (true);
+    }
+}
+#endif

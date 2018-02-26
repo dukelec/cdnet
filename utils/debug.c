@@ -97,8 +97,10 @@ void debug_flush(void)
         static dbg_node_t *cur_buf = NULL;
         if (!uart_transmit_is_ready(&debug_uart))
             return;
-        if (cur_buf)
+        if (cur_buf) {
             list_put_it(&dbg_free, &cur_buf->node);
+            cur_buf = NULL;
+        }
 #endif
 
         if (dbg_lost_last != dbg_lost_cnt) {
