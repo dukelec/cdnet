@@ -68,7 +68,7 @@ First byte:
 | [6]     | Always 0                                          |
 | [5]     | MULTI_NET                                         |
 | [4]     | MULTICAST                                         |
-| [3]     | SEQ_NO                                            |
+| [3]     | SEQUENCE                                          |
 | [2:0]   | PORT_SIZE                                         |
 
 Notes: All fields reserved in this document must be 0.
@@ -89,9 +89,9 @@ When communication with PC:
  - The `net` is mapped to byte 8 of IPv6 Unique Local Address.
  - The `mac` is mapped to byte 16 of IPv6 Unique Local Address.
 
-### SEQ_NO
+### SEQUENCE
 0: No sequence number;  
-1: Append 1 byte sequence number, see [Port 0](#port-0).
+1: Append 1 byte `SEQ_NUM`, see [Port 0](#port-0).
 
 
 ### PORT_SIZE:
@@ -120,7 +120,7 @@ First byte:
 | [7]     | Always 1                                          |
 | [6]     | Always 1                                          |
 | [5:4]   | FRAGMENT                                          |
-| [3]     | SEQ_NO                                            |
+| [3]     | SEQUENCE                                          |
 | [2:0]   | User-defined flag                                 |
 
 ### FRAGMENT:
@@ -133,12 +133,12 @@ First byte:
 | 1    | 1      | Last fragment         |
 
 Note:
- - `SEQ_NO` must be selected when using fragments.
- - There is no need to reset the `SEQ_NO` number when starting the fragmentation.
+ - `SEQUENCE` must be selected when using fragments.
+ - There is no need to reset the `SEQ_NUM` when starting the fragmentation.
 
-### SEQ_NO
+### SEQUENCE
 0: No sequence number;  
-1: Append 1 byte sequence number, see [Port 0](#port-0).
+1: Append 1 byte `SEQ_NUM`, see [Port 0](#port-0).
 
 
 ## Specific Ports
@@ -152,68 +152,62 @@ It is recommended to implement at least the basic part of port 1 (device info).
 
 ### Port 0
 
-Used together with header's `SEQ_NO` for flow control and ensure data integrity.  
-Bit 7 of `SEQ_NO` is set indicating that an `ACK` is required.  
-The `SEQ_NO[6:0]` auto increase when `SEQ_NO` is selected in the header.  
-Do not select `SEQ_NO` for port 0 communication.
+Used together with header's `SEQUENCE` for flow control and ensure data integrity.  
+The `SEQ_NUM[6:0]` auto increase when `SEQUENCE` is selected in the header.  
+Bit 7 of `SEQ_NUM` is set indicating that a report is required.  
+Do not select `SEQUENCE` for port 0 communication self.
 
 Port 0 communications:
 ```
-Write [] (empty) to port 0: check the RX free space and the SEQ_NO corresponding to the requester,
-return: [FREE_PKT, CUR_SEQ_NO] (2 bytes), CUR_SEQ_NO bit 7 indicates that there is no record.
+Check the SEQ_NUM:
+  Write []
+  Return: [SEQ_NUM] (no record found if bit 7 set)
 
-Write [0x00, SET_SEQ_NO] to port 0: set the SEQ_NO which corresponding to the requester,
-return: [] (empty).
+Set the SEQ_NUM:
+  Write [0x00, SEQ_NUM]
+  Return: []
 
-Report [0x80, FREE_PKT, ACK_SEQ_NO] to port 0 if ACK is required,
-no return.
-
-Report [0x81, FREE_PKT, CUR_SEQ_NO] to port 0 if wrong sequence detected and droped (optional),
-no return.
+Report SEQ_NUM:
+  Write [SEQ_NUM]
+  Return: None
 ```
 
-Example: (device A send packets to device B)
+Example:  
+(`->` and `<-` is port level communication, `>>` and `<<` is frame level communication)
 
-Device B maintain a `SEQ_NO` record list for each remote device, when the list is full, drop the oldest record.
-
-Before the first transmission, or the record has been dropped, device A should init the `SEQ_NO` for B:
 ```
-Send [0x00, 0x00] from A default port to B port 0,
-Return [] (empty) from B port 0 to A default port.
-```
+  Device A                      Device B        Description
 
-Send multipule packets from A to B:
-```
-[0x88, 0x00, ...] // first byte: level 1 header, second byte: SEQ_NO
-[0x88, 0x01, ...]
-...
-[0x88, 0x0e, ...]
-[0x88, 0x8f, ...] // require ACK
-  
-[0x88, 0x10, ...]
-[0x88, 0x11, ...]
-...
-[0x88, 0x9f, ...] // require ACK
-
-Wait for first ACK before continue send.
+  [0x00, 0x00]          ->      Port0           Set SEQ_NUM at first time
+  Default port          <-      []              Set return
+  [0x88, 0x00, ...]     >>                      Start send data
+  [0x88, 0x01, ...]     >>
+  [0x88, 0x82, ...]     >>                      Require report at SEQ_NUM 2
+  [0x88, 0x03, ...]     >>
+  [0x88, 0x04, ...]     >>
+  Port0                 <-      [0x03]          Report after receive SEQ_NUM 2
+  [0x88, 0x85, ...]     >>                      Require report at SEQ_NUM 5
+  Port0                 <-      [0x06]          Report after receive SEQ_NUM 5
 ```
 
-Return `ACK` from B to A:
-```
-Send [0x80, FREE_PKT, 0x0f] from B default port to A port 0.
-```
 
 ### Port 1
 
 Provide device info.
 
-Write `[]` (empty) to port 1: check `device_info` string,  
-Return `device_info` string: (any sequence, must contain at least model field)  
- - Conventions: `M: model; S: serial string; HW: hardware version; SW: software version`.
+```
+Check device_info string:
+  Write []
+  Return ["device_info"]
 
-Write `filter_string` to port 1: search device by string, (optional)  
-Return `device_info` string if `device_info` contain `filter_string`.
-
+Search device by string (optional):
+  Write ["filter_string"]
+  Return ["device_info"] if "device_info" contain "filter_string"
+  Return None otherwise
+```
+Example of `device_info`:  
+  `M: model; S: serial string; HW: hardware version; SW: software version` ...  
+Do not care about the field order, and should at least include the model field.
 
 ### Port 2
 
@@ -222,16 +216,19 @@ Set device baud rate.
 Type of baud_rate is uint32_t, e.g. 115200;
 Type of interface is uint8_t.
 
-Write [0x00, baud_rate]: set current interface to same baud rate, or
-Write [0x00, baud_rate_low, baud_rate_high]: set current interface to multi baud rate,
-return: [] (empty) // change baud rate after return
+Set current interface baud rate：
+  Write [0x00, baud_rate]                       // single baud rate
+  Write [0x00, baud_rate_low, baud_rate_high]   // dual baud rate
+  return: []                                    // change baud rate after return
 
-Write [0x08, interface, baud_rate], or
-Write [0x08, interface, baud_rate_low, baud_rate_high]: set baud rate for the interface,
-return: [] (empty)
+Set baud rate for specified interface:
+  Write [0x08, interface, baud_rate]
+  Write [0x08, interface, baud_rate_low, baud_rate_high]
+  return: []
 
-Write [0x08, interface]: check baud rate of the interface,
-return: [baud_rate] or [baud_rate_low, baud_rate_high]
+Check baud rate for specified interface:
+  Write [0x08, interface]
+  return: [baud_rate] or [baud_rate_low, baud_rate_high]
 ```
 
 ### Port 3
@@ -242,52 +239,58 @@ Type of mac and net is uint8_t;
 Type of intf is uint8_t;
 Type of max_time_ms is uint8_t.
 
-Write [0x00, mac]: change mac address of current interface,
-return: [] (empty) // change mac address after return
+Change mac address for current interface:
+  Write [0x00, new_mac]
+  return: []        // change mac address after return
 
-Write [0x01, net]: change net id of current interface,
-return: [] (empty) // change net id after return
+Change net id for current interface:
+  Write [0x01, new_net]
+  return: []        // change net id after return
 
-Write [0x01]: check net id of current interface,
-return: [net]
+Check net id of current interface:
+  Write [0x01]
+  return: [net]
 
-Write [0x08, intf, mac]: set mac address for the interface,
-return: [] (empty)
+Set mac address for specified interface:
+  Write [0x08, intf, new_mac]
+  return: []
 
-Write [0x09, intf, net]: set net id for the interface,
-return: [] (empty)
+Set net id for specified interface:
+  Write [0x09, intf, new_net]
+  return: []
 
-Write [0x08, intf]: check mac address of the interface,
-return: [mac]
+Check mac address for specified interface:
+  Write [0x08, intf]
+  return: [mac]
 
-Write [0x09, intf]: check net id of the interface,
-return: [net]
+Check net id for specified interface:
+  Write [0x09, intf]
+  return: [net]
+
 
 For mac address auto allocation:
 
-Write [0x00, select_start, select_end, max_time_ms]:
-  if current mac address in the range [select_start, select_end], then
-    after wait a random time in the range [0, max_time_ms]:
-      (if detect bus busy during wait, re-generate the random time and re-wait after bus idle)
-      return the device_info string
-  else
-    ignore
+  Write [0x00, select_start, select_end, max_time_ms]:
+    if current mac address in the range [select_start, select_end], then
+      after wait a random time in the range [0, max_time_ms]:
+        (if detect bus busy during wait, re-generate the random time and re-wait after bus idle)
+        return the device_info string
+    else
+      ignore
 
-Write [0x00, select_start, select_end, target_start, target_end]:
-  if current address in the range [select_start, select_end], then
-    update current interface to a random mac address between [target_start, target_end]
-  else
-    ignore
-no return.
+  Write [0x00, select_start, select_end, target_start, target_end]:
+    if current address in the range [select_start, select_end], then
+      update current interface to a random mac address between [target_start, target_end]
+    else
+      ignore
+  no return.
 ```
 
 
 ## Examples
 
-Request device info:
- - Local network
- - Request: `0x0c` -> `0x0d` (MAC address)
- - Reply: `0x0d` -> `0x0c`
+Request device info:  
+(Local network, requester's MAC address: `0x0c`, target's MAC address: `0x0d`)
 
 Reply the device info string: `"M: c1; S: 1234"`,
 expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a, 0x20, 0x31, 0x32, 0x33, 0x34]`.

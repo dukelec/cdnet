@@ -211,4 +211,3 @@ static inline bool is_addr_equal(const cdnet_addr_t *a, const cdnet_addr_t *b)
 }
 
 #endif
-

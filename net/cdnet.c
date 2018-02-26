@@ -95,12 +95,21 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         pkt = cdnet_packet_get(intf->free_head);
 
-        if ((frame->dat[3] & 0xc0) == 0xc0)
+        if ((frame->dat[3] & 0xc0) == 0xc0) {
             ret_val = cdnet_l2_from_frame(intf, frame->dat, pkt);
-        else if (frame->dat[3] & 0x80)
+        } else if (frame->dat[3] & 0x80) {
             ret_val = cdnet_l1_from_frame(intf, frame->dat, pkt);
-        else
+        } else {
             ret_val = cdnet_l0_from_frame(intf, frame->dat, pkt);
+            pkt->seq = false;
+        }
+
+        if (pkt->level != CDNET_L1)
+            pkt->multi = CDNET_MULTI_NONE;
+        if (pkt->level != CDNET_L2) {
+            pkt->frag = CDNET_FRAG_NONE;
+            pkt->l2_flag = 0;
+        }
 
         cd_intf->put_free_frame(cd_intf, frame);
 
@@ -115,17 +124,17 @@ void cdnet_rx(cdnet_intf_t *intf)
             return;
         }
 
-        if (pkt->level != CDNET_L2 && pkt->dst_port == 0 &&
-                pkt->src_port >= CDNET_DEF_PORT) {
-            cdnet_p0_request_handle(intf, pkt);
-            return;
+        if (pkt->level != CDNET_L2) {
+            if (pkt->dst_port == 0 && pkt->src_port >= CDNET_DEF_PORT) {
+                cdnet_p0_request_handle(intf, pkt);
+                return;
+            }
+            if (pkt->src_port == 0 && pkt->dst_port == CDNET_DEF_PORT) {
+                cdnet_p0_reply_handle(intf, pkt);
+                return;
+            }
         }
-        if (pkt->level != CDNET_L2 && pkt->src_port == 0 &&
-                pkt->dst_port == CDNET_DEF_PORT) {
-            cdnet_p0_reply_handle(intf, pkt);
-            return;
-        }
-        if (pkt->level != CDNET_L0 && pkt->seq) {
+        if (pkt->seq) {
             cdnet_seq_rx_handle(intf, pkt);
             return;
         }
