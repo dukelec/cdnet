@@ -469,7 +469,15 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                 continue;
             }
             r->seq_num = 0;
-            r->p0_req->level = CDNET_L0; // TODO: add multi_net support
+            // send set_seq
+            if (r->addr.net == 255) {
+                r->p0_req->level = CDNET_L0;
+                r->p0_req->multi = CDNET_MULTI_NONE;
+            } else {
+                r->p0_req->level = CDNET_L1;
+                r->p0_req->multi = CDNET_MULTI_NET;
+                r->p0_req->dst_addr = r->addr;
+            }
             r->p0_req->dst_mac = r->addr.mac;
             cdnet_fill_src_addr(intf, r->p0_req);
             r->p0_req->src_port = CDNET_DEF_PORT;
@@ -496,7 +504,15 @@ void cdnet_seq_tx_task(cdnet_intf_t *intf)
                     dd_error(intf->name, "tx: chk_seq: no free pkt\n");
                     continue;
                 }
-                r->p0_req->level = CDNET_L0; // TODO: add multi_net support
+                // send check_seq
+                if (r->addr.net == 255) {
+                    r->p0_req->level = CDNET_L0;
+                    r->p0_req->multi = CDNET_MULTI_NONE;
+                } else {
+                    r->p0_req->level = CDNET_L1;
+                    r->p0_req->multi = CDNET_MULTI_NET;
+                    r->p0_req->dst_addr = r->addr;
+                }
                 r->p0_req->dst_mac = r->addr.mac;
                 cdnet_fill_src_addr(intf, r->p0_req);
                 r->p0_req->src_port = CDNET_DEF_PORT;
