@@ -96,7 +96,11 @@ void cdnet_rx(cdnet_intf_t *intf)
         pkt = cdnet_packet_get(intf->free_head);
 
         if ((frame->dat[3] & 0xc0) == 0xc0) {
+#ifdef CDNET_USE_L2
             ret_val = cdnet_l2_from_frame(intf, frame->dat, pkt);
+#else
+            ret_val = -1;
+#endif
         } else if (frame->dat[3] & 0x80) {
             ret_val = cdnet_l1_from_frame(intf, frame->dat, pkt);
         } else {

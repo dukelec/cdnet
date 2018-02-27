@@ -72,6 +72,7 @@ void cdctl_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
     uint32_t flags;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     local_irq_save(flags);
+    intf->tx_cnt++;
     list_put(&intf->tx_head, &frame->node);
     if (intf->state == CDCTL_IDLE)
         cdctl_int_isr(intf);
@@ -151,6 +152,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     list_head_init(&intf->tx_head);
     intf->tx_wait_trigger = false;
     intf->tx_buf_clean_mask = false;
+    intf->rx_cnt = 0;
+    intf->tx_cnt = 0;
     intf->rx_lost_cnt = 0;
     intf->rx_error_cnt = 0;
     intf->tx_cd_cnt = 0;
@@ -333,6 +336,7 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
         if (frame) {
             list_put_it(&intf->rx_head, &intf->rx_frame->node);
             intf->rx_frame = frame;
+            intf->rx_cnt++;
         } else {
             intf->rx_no_free_node_cnt++;
         }

@@ -103,14 +103,14 @@ void debug_flush(void)
         }
 #endif
 
-        if (dbg_lost_last != dbg_lost_cnt) {
-            _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
-            dbg_lost_last = dbg_lost_cnt;
-        }
-
         dbg_node_t *buf = list_get_entry_it(&dbg_tx, dbg_node_t);
-        if (!buf)
-            break;
+        if (!buf) {
+            if (dbg_lost_last != dbg_lost_cnt) {
+                _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
+                dbg_lost_last = dbg_lost_cnt;
+            }
+            return;
+        }
 #ifdef DBG_TX_IT
         uart_transmit_it(&debug_uart, buf->data, buf->len);
         cur_buf = buf;

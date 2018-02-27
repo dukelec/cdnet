@@ -112,12 +112,17 @@ static int cdnet_send_pkt(cdnet_intf_t *intf, cdnet_packet_t *pkt)
         return -1;
     }
 
-    if (pkt->level == CDNET_L0)
+    if (pkt->level == CDNET_L0) {
         ret_val = cdnet_l0_to_frame(intf, pkt, frame->dat);
-    else if (pkt->level == CDNET_L1)
+    } else if (pkt->level == CDNET_L1) {
         ret_val = cdnet_l1_to_frame(intf, pkt, frame->dat);
-    else if (pkt->level == CDNET_L2)
+    } else if (pkt->level == CDNET_L2) {
+#ifdef CDNET_USE_L2
         ret_val = cdnet_l2_to_frame(intf, pkt, frame->dat);
+#else
+        ret_val = -1;
+#endif
+    }
 
     if (ret_val == 0) {
         cd_intf->put_tx_frame(cd_intf, frame);

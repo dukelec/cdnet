@@ -45,6 +45,8 @@ typedef struct {
 
     uint8_t         buf[4];
 
+    uint32_t        rx_cnt;
+    uint32_t        tx_cnt;
     uint32_t        rx_lost_cnt;
     uint32_t        rx_error_cnt;
     uint32_t        tx_cd_cnt;
