@@ -116,27 +116,27 @@ void cdnet_rx(cdnet_intf_t *intf)
         if (ret_val != 0) {
             dd_error(intf->name, "rx: from_frame err\n");
             cdnet_list_put(intf->free_head, &pkt->node);
-            return;
+            continue;
         }
         if (pkt->multi & CDNET_MULTI_CAST) {
             dd_error(intf->name, "rx: not support multicast yet\n");
             cdnet_list_put(intf->free_head, &pkt->node);
-            return;
+            continue;
         }
 
         if (pkt->level != CDNET_L2) {
             if (pkt->dst_port == 0 && pkt->src_port >= CDNET_DEF_PORT) {
                 cdnet_p0_request_handle(intf, pkt);
-                return;
+                continue;
             }
             if (pkt->src_port == 0 && pkt->dst_port == CDNET_DEF_PORT) {
                 cdnet_p0_reply_handle(intf, pkt);
-                return;
+                continue;
             }
         }
         if (pkt->seq) {
             cdnet_seq_rx_handle(intf, pkt);
-            return;
+            continue;
         }
 
         // send left pkt to upper layer directly
