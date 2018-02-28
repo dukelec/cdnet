@@ -98,8 +98,8 @@ static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
 {
     uint16_t l, h;
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    l = ((float)CDCTL_SYS_CLK / low) - 1 + 0.5;
-    h = ((float)CDCTL_SYS_CLK / high) - 1 + 0.5;
+    l = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, low) - 1;
+    h = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, high) - 1;
     cdctl_write_reg(intf, REG_DIV_LS_L, l & 0xff);
     cdctl_write_reg(intf, REG_DIV_LS_H, l >> 8);
     cdctl_write_reg(intf, REG_DIV_HS_L, h & 0xff);
@@ -116,8 +116,8 @@ static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
             cdctl_read_reg(intf, REG_DIV_LS_H) << 8;
     h = cdctl_read_reg(intf, REG_DIV_HS_L) |
             cdctl_read_reg(intf, REG_DIV_HS_H) << 8;
-    *low = ((float)CDCTL_SYS_CLK / (l + 1)) + 0.5;
-    *high = ((float)CDCTL_SYS_CLK / (h + 1)) + 0.5;
+    *low = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, l + 1);
+    *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
 }
 
 static void cdctl_flush(cd_intf_t *cd_intf)
