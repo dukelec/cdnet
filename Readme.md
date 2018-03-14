@@ -85,10 +85,6 @@ Notes: All fields reserved in this document must be 0.
 Notes:
  - Broadcast could simply not use the MULTICAST bit.
 
-When communication with PC:
- - The `net` is mapped to byte 8 of IPv6 Unique Local Address.
- - The `mac` is mapped to byte 16 of IPv6 Unique Local Address.
-
 ### SEQUENCE
 0: No sequence number;  
 1: Append 1 byte `SEQ_NUM`, see [Port 0](#port-0).
@@ -173,7 +169,7 @@ Report SEQ_NUM:
 ```
 
 Example:  
-(`->` and `<-` is port level communication, `>>` and `<<` is frame level communication)
+(`->` and `<-` is port level communication, `>>` and `<<` is packet level communication)
 
 ```
   Device A                      Device B        Description
