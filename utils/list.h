@@ -10,9 +10,6 @@
 #ifndef __LIST_H__
 #define __LIST_H__
 
-#include "common.h"
-
-
 typedef struct list_node {
    struct list_node *next;
 } list_node_t;

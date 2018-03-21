@@ -7,6 +7,7 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
+#include "common.h"
 #include "list.h"
 
 #ifdef LIST_DEBUG

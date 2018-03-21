@@ -10,8 +10,9 @@
 #ifndef __CDCTL_BX_REGS_H__
 #define __CDCTL_BX_REGS_H__
 
-#include "common.h"
-#include "cdnet.h"
+#ifndef CDCTL_VER
+#define CDCTL_VER           0x04
+#endif
 
 #ifndef CDCTL_SYS_CLK
 #define CDCTL_SYS_CLK       40000000UL // 40MHz
@@ -61,5 +62,6 @@
 #define BIT_TX_START                (1 << 1)
 #define BIT_TX_CLR_CD               (1 << 2)
 #define BIT_TX_CLR_ERROR            (1 << 3)
+#define BIT_TX_ABORT                (1 << 4)
 
 #endif

@@ -10,7 +10,6 @@
 #ifndef __CDCTL_BX_H__
 #define __CDCTL_BX_H__
 
-#include "common.h"
 #include "cdnet.h"
 
 typedef struct {

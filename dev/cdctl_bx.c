@@ -7,7 +7,6 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#include "common.h"
 #include "cdctl_bx.h"
 #include "cdctl_bx_regs.h"
 
@@ -164,15 +163,9 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         gpio_set_value(rst_n, 1);
     }
 
-    while (true) {
-        uint8_t ver = cdctl_read_reg(intf, REG_VERSION);
-        if (ver != 0xff && ver != 0x00 &&
-                ver == cdctl_read_reg(intf, REG_VERSION)) {
-            dd_info(intf->name, "version: %02x\n", ver);
-            break;
-        }
+    while (cdctl_read_reg(intf, REG_VERSION) != CDCTL_VER)
         debug_flush();
-    }
+    dd_info(intf->name, "version: %02x\n", cdctl_read_reg(intf, REG_VERSION));
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
     cdctl_set_filter(&intf->cd_intf, filter);

@@ -95,7 +95,7 @@ void debug_flush(void)
     while (true) {
 #ifdef DBG_TX_IT
         static dbg_node_t *cur_buf = NULL;
-        if (!uart_transmit_is_ready(&debug_uart))
+        if (!dbg_transmit_is_ready(&debug_uart))
             return;
         if (cur_buf) {
             list_put_it(&dbg_free, &cur_buf->node);
@@ -112,10 +112,10 @@ void debug_flush(void)
             return;
         }
 #ifdef DBG_TX_IT
-        uart_transmit_it(&debug_uart, buf->data, buf->len);
+        dbg_transmit_it(&debug_uart, buf->data, buf->len);
         cur_buf = buf;
 #else
-        uart_transmit(&debug_uart, buf->data, buf->len);
+        dbg_transmit(&debug_uart, buf->data, buf->len);
         list_put_it(&dbg_free, &buf->node);
 #endif
     }
@@ -129,7 +129,7 @@ int _write(int file, char *data, int len)
       errno = EBADF;
       return -1;
    }
-   uart_transmit(&debug_uart, (uint8_t *)data, len);
+   dbg_transmit(&debug_uart, (uint8_t *)data, len);
    return len;
 }
 

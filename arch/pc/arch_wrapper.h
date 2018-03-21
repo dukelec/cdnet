@@ -10,9 +10,6 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
-#include "common.h"
-
-
 #define local_irq_save(flags)       \
     do { } while (0)
 #define local_irq_restore(flags)    \

@@ -10,9 +10,8 @@
 #ifndef __CDBUS_UART_H__
 #define __CDBUS_UART_H__
 
-#include "common.h"
-#include "modbus_crc.h"
 #include "cdnet.h"
+#include "modbus_crc.h"
 
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms

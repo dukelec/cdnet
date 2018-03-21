@@ -10,9 +10,7 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
-#include "common.h"
 #include "stm32f1xx_hal.h"
-#include "stm32f103xb.h"
 
 
 #define local_irq_save(flags)       \
@@ -72,49 +70,6 @@ typedef struct {
     UART_HandleTypeDef *huart;
 } uart_t;
 
-static inline void uart_receive_flush(uart_t *uart)
-{
-    if (uart->huart->Instance->SR & USART_SR_RXNE) { // avoid ORE error
-        volatile int tmp = uart->huart->Instance->DR;
-        (void)tmp; // suppress warning
-    }
-}
-
-static inline int uart_receive_it(uart_t *uart, uint8_t *buf, uint16_t len)
-{
-    return HAL_UART_Receive_IT(uart->huart, buf, len);
-}
-
-static inline int uart_abort_receive_it(uart_t *uart)
-{
-    return HAL_UART_AbortReceive_IT(uart->huart);
-}
-
-static inline int uart_receive(uart_t *uart, uint8_t *buf, uint16_t len)
-{
-    // not block, so len should be 1
-    return HAL_UART_Receive(uart->huart, buf, len, 0 /* timeout */);
-}
-
-static inline int uart_transmit_it(uart_t *uart, const uint8_t *buf, uint16_t len)
-{
-    return HAL_UART_Transmit_IT(uart->huart, (uint8_t *)buf, len);
-}
-
-static inline int uart_transmit_is_ready(uart_t *uart)
-{
-    return uart->huart->gState == HAL_UART_STATE_READY;
-}
-
-static inline int uart_transmit(uart_t *uart, const uint8_t *buf, uint16_t len)
-{
-    uint16_t i;
-    for (i = 0; i < len; i++) {
-        while (!__HAL_UART_GET_FLAG(uart->huart, UART_FLAG_TXE));
-        uart->huart->Instance->DR = *(buf + i);
-    }
-    return 0;
-}
 
 #ifdef ARCH_SPI
 // spi wrapper

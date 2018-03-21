@@ -10,7 +10,6 @@
 #ifndef __CDCTL_BX_IT_H__
 #define __CDCTL_BX_IT_H__
 
-#include "common.h"
 #include "cdnet.h"
 
 typedef enum {
