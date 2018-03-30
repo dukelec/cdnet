@@ -155,7 +155,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 #ifdef VERBOSE
                     char pbuf[52];
                     hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-                    dd_verbose(intf->name, "rx [%s]\n", pbuf);
+                    dd_verbose(intf->name, "-> [%s]\n", pbuf);
 #endif
                     cduart_list_put(&intf->rx_head, &intf->rx_frame->node);
                     intf->rx_frame = frm;

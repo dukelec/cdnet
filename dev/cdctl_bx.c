@@ -203,9 +203,13 @@ void cdctl_task(cdctl_intf_t *intf)
         // if get free list: copy to rx list
         cd_frame_t *frame = list_get_entry(intf->free_head, cd_frame_t);
         if (frame) {
-            dd_verbose(intf->name, "get_rx\n");
             cdctl_read_frame(intf, frame);
             cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_PENDING);
+#ifdef VERBOSE
+            char pbuf[52];
+            hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+            dd_verbose(intf->name, "-> [%s]\n", pbuf);
+#endif
             list_put(&intf->rx_head, &frame->node);
         } else {
             dd_error(intf->name, "get_rx, no free frame\n");
@@ -214,17 +218,19 @@ void cdctl_task(cdctl_intf_t *intf)
 
     if (!intf->is_pending && intf->tx_head.first) {
         cd_frame_t *frame = list_get_entry(&intf->tx_head, cd_frame_t);
-        dd_verbose(intf->name, "write frame\n");
         cdctl_write_frame(intf, frame);
 
         flags = cdctl_read_reg(intf, REG_INT_FLAG);
-        if (flags & BIT_FLAG_TX_BUF_CLEAN) {
-            dd_verbose(intf->name, "trigger tx\n");
+        if (flags & BIT_FLAG_TX_BUF_CLEAN)
             cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
-        } else {
+        else
             intf->is_pending = true;
-            dd_verbose(intf->name, "pending\n");
-        }
+#ifdef VERBOSE
+        char pbuf[52];
+        hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+        dd_verbose(intf->name, "<- [%s]%s\n",
+                pbuf, intf->is_pending ? " (p)" : "");
+#endif
         list_put(intf->free_head, &frame->node);
     }
 
