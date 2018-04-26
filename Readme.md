@@ -310,6 +310,6 @@ The Level 1 Format:
 
 ### Code Examples
 
-How to use this library refer to `cdnet_bridge` and `cdnet_tun` project;  
+How to use this library refer to `stepper_motor_controller`, `cdbus_bridge` or `cdnet_tun` projects;  
 How to control CDCTL-Bx refer to `dev/cdctl_bx_xxx`.
 
