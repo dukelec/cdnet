@@ -190,15 +190,20 @@ Example:
 ### Port 1
 
 Provide device info.
-
 ```
+Type of mac_start and mac_end is uint8_t;
+Type of max_time is uint16_t, unit: ms;
+Type of "string" is any length of string, include empty.
+
 Check device_info string:
   Write []
   Return ["device_info"]
 
-Search device by string (optional):
-  Write ["filter_string"]
-  Return ["device_info"] if "device_info" contain "filter_string"
+Search device by filters (need by mac auto allocation):
+  Write [max_time, mac_start, mac_end, "string"]
+  Return ["device_info"] after a random time in range [0, max_time]
+    only if "device_info" contain "string" (always true for empty string) and
+    current mac address is in the range [mac_start, mac_end]
   Return None otherwise
 ```
 Example of `device_info`:  
@@ -210,21 +215,21 @@ Do not care about the field order, and should at least include the model field.
 Set device baud rate.
 ```
 Type of baud_rate is uint32_t, e.g. 115200;
-Type of interface is uint8_t.
+Type of intf is uint8_t.
 
 Set current interface baud rate：
   Write [0x00, baud_rate]                       // single baud rate
   Write [0x00, baud_rate_low, baud_rate_high]   // dual baud rate
-  return: []                                    // change baud rate after return
+  Return: []                                    // change baud rate after return
 
 Set baud rate for specified interface:
-  Write [0x08, interface, baud_rate]
-  Write [0x08, interface, baud_rate_low, baud_rate_high]
-  return: []
+  Write [0x08, intf, baud_rate]
+  Write [0x08, intf, baud_rate_low, baud_rate_high]
+  Return: []
 
 Check baud rate for specified interface:
-  Write [0x08, interface]
-  return: [baud_rate] or [baud_rate_low, baud_rate_high]
+  Write [0x08, intf]
+  Return: [baud_rate] or [baud_rate_low, baud_rate_high]
 ```
 
 ### Port 3
@@ -233,53 +238,36 @@ Set device address.
 ```
 Type of mac and net is uint8_t;
 Type of intf is uint8_t;
-Type of max_time_ms is uint8_t.
+Type of "string" is any length of string, include empty.
 
 Change mac address for current interface:
-  Write [0x00, new_mac]
-  return: []        // change mac address after return
+  Write [0x00, new_mac, "string"]:              // "string" is optional (need by mac auto allocation)
+  Return [] if "device_info" contain "string"   // change mac address after return
+  Return None and ignore the command otherwise
 
 Change net id for current interface:
   Write [0x01, new_net]
-  return: []        // change net id after return
+  Return: []                                    // change net id after return
 
 Check net id of current interface:
   Write [0x01]
-  return: [net]
+  Return: [net]
 
 Set mac address for specified interface:
   Write [0x08, intf, new_mac]
-  return: []
+  Return: []
 
 Set net id for specified interface:
   Write [0x09, intf, new_net]
-  return: []
+  Return: []
 
 Check mac address for specified interface:
   Write [0x08, intf]
-  return: [mac]
+  Return: [mac]
 
 Check net id for specified interface:
   Write [0x09, intf]
-  return: [net]
-
-
-For mac address auto allocation:
-
-  Write [0x00, select_start, select_end, max_time_ms]:
-    if current mac address in the range [select_start, select_end], then
-      after wait a random time in the range [0, max_time_ms]:
-        (if detect bus busy during wait, re-generate the random time and re-wait after bus idle)
-        return the device_info string
-    else
-      ignore
-
-  Write [0x00, select_start, select_end, target_start, target_end]:
-    if current address in the range [select_start, select_end], then
-      update current interface to a random mac address between [target_start, target_end]
-    else
-      ignore
-  no return.
+  Return: [net]
 ```
 
 
