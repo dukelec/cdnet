@@ -170,9 +170,20 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         gpio_set_value(rst_n, 1);
     }
 
-    while (cdctl_read_reg(intf, REG_VERSION) != CDCTL_VER)
+    uint8_t last_ver = 0xff;
+    uint8_t same_cnt = 0;
+    while (true) {
+        uint8_t ver = cdctl_read_reg(intf, REG_VERSION);
+        if (ver != 0x00 && ver != 0xff && ver == last_ver) {
+            if (same_cnt++ > 10)
+                break;
+        } else {
+            last_ver = ver;
+            same_cnt = 0;
+        }
         debug_flush();
-    dd_info(intf->name, "version: %02x\n", cdctl_read_reg(intf, REG_VERSION));
+    }
+    dd_info(intf->name, "version: %02x\n", last_ver);
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
     cdctl_set_filter(&intf->cd_intf, filter);
