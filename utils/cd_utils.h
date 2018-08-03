@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -7,8 +7,12 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#ifndef __COMMON_H__
-#define __COMMON_H__
+#ifndef __CD_UTILS_H__
+#define __CD_UTILS_H__
+
+#if __has_include("cd_config.h")
+#include "cd_config.h"
+#endif
 
 #include <errno.h>
 #include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
@@ -73,26 +77,5 @@
                 (((__x) + ((__d) / 2)) / (__d)) :                           \
                 (((__x) - ((__d) / 2)) / (__d));                            \
     })
-
-
-#if __has_include("common_prepend.h")
-#include "common_prepend.h"
-#endif
-
-#if __has_include("arch_wrapper.h")
-#include "arch_wrapper.h"
-#endif
-
-#if __has_include("list.h")
-#include "list.h"
-#endif
-
-#if __has_include("debug.h")
-#include "debug.h"
-#endif
-
-#if __has_include("common_append.h")
-#include "common_append.h"
-#endif
 
 #endif

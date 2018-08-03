@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -86,7 +86,7 @@ void cdnet_rx(cdnet_intf_t *intf)
 
     while (true) {
         if (!intf->free_head->first) {
-            dd_warn(intf->name, "rx: no free pkt\n");
+            dn_warn(intf->name, "rx: no free pkt\n");
             return;
         }
 
@@ -118,12 +118,12 @@ void cdnet_rx(cdnet_intf_t *intf)
         cd_intf->put_free_frame(cd_intf, frame);
 
         if (ret_val != 0) {
-            dd_error(intf->name, "rx: from_frame err\n");
+            dn_error(intf->name, "rx: from_frame err\n");
             cdnet_list_put(intf->free_head, &pkt->node);
             continue;
         }
         if (pkt->multi & CDNET_MULTI_CAST) {
-            dd_error(intf->name, "rx: not support multicast yet\n");
+            dn_error(intf->name, "rx: not support multicast yet\n");
             cdnet_list_put(intf->free_head, &pkt->node);
             continue;
         }

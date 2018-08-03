@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -9,17 +9,7 @@
  *   Duke Fong <duke@dukelec.com>
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
-
-#include "common.h"
+#include "cd_utils.h"
 
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int limit)

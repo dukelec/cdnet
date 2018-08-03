@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -103,7 +103,7 @@ static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
     cdctl_write_reg(intf, REG_DIV_LS_H, l >> 8);
     cdctl_write_reg(intf, REG_DIV_HS_L, h & 0xff);
     cdctl_write_reg(intf, REG_DIV_HS_H, h >> 8);
-    dd_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
+    dn_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
 static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
@@ -164,7 +164,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->rst_n = rst_n;
     intf->int_n = int_n;
 
-    dd_info(intf->name, "init...\n");
+    dn_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
         gpio_set_value(rst_n, 1);
@@ -183,14 +183,14 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         }
         debug_flush();
     }
-    dd_info(intf->name, "version: %02x\n", last_ver);
+    dn_info(intf->name, "version: %02x\n", last_ver);
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
     cdctl_set_filter(&intf->cd_intf, filter);
     cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
     cdctl_flush(&intf->cd_intf);
 
-    dd_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
+    dn_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
     cdctl_write_reg(intf, REG_INT_MASK, CDCTL_MASK);
     // enable int_n interrupt at outside
 }
@@ -371,5 +371,5 @@ void cdctl_spi_isr(cdctl_intf_t *intf)
         return;
     }
 
-    dd_warn(intf->name, "unexpected spi dma cb\n");
+    dn_warn(intf->name, "unexpected spi dma cb\n");
 }

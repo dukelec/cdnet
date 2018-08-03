@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -10,7 +10,9 @@
 #ifndef __CDNET_H__
 #define __CDNET_H__
 
-#include "common.h"
+#include "cd_utils.h"
+#include "arch_wrapper.h"
+#include "cd_list.h"
 
 #ifndef CDNET_DEF_PORT
 #define CDNET_DEF_PORT      0xcdcd

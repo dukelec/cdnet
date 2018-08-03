@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -116,7 +116,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 
         if (intf->rx_byte_cnt != 0 &&
                 get_systick() - intf->t_last > CDUART_IDLE_TIME) {
-            dd_warn(intf->name, "drop timeout, cnt: %d\n", intf->rx_byte_cnt);
+            dn_warn(intf->name, "drop timeout, cnt: %d\n", intf->rx_byte_cnt);
             intf->rx_byte_cnt = 0;
             intf->rx_crc = 0xffff;
         }
@@ -135,7 +135,7 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
                         !rx_match_filter(intf, frame, false)) ||
                         (intf->rx_byte_cnt >= 1 &&
                                 !rx_match_filter(intf, frame, true)))) {
-            dd_warn(intf->name, "filtered, len: %d, [%02x, %02x ...]\n",
+            dn_warn(intf->name, "filtered, len: %d, [%02x, %02x ...]\n",
                     intf->rx_byte_cnt, frame->dat[0], frame->dat[1]);
             intf->rx_byte_cnt = 0;
             intf->rx_crc = 0xffff;
@@ -148,20 +148,20 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
 
         if (intf->rx_byte_cnt == frame->dat[2] + 5) {
             if (intf->rx_crc != 0) {
-                dd_error(intf->name, "crc error\n");
+                dn_error(intf->name, "crc error\n");
             } else {
                 cd_frame_t *frm = cduart_frame_get(intf->free_head);
                 if (frm) {
 #ifdef VERBOSE
                     char pbuf[52];
                     hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-                    dd_verbose(intf->name, "-> [%s]\n", pbuf);
+                    dn_verbose(intf->name, "-> [%s]\n", pbuf);
 #endif
                     cduart_list_put(&intf->rx_head, &intf->rx_frame->node);
                     intf->rx_frame = frm;
                 } else {
                     // set rx_lost flag
-                    dd_error(intf->name, "rx_lost\n");
+                    dn_error(intf->name, "rx_lost\n");
                 }
             }
             intf->rx_byte_cnt = 0;

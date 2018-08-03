@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -7,8 +7,8 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#include "common.h"
-#include "list.h"
+#include "cd_utils.h"
+#include "cd_list.h"
 
 #ifdef LIST_DEBUG
 #include <unwind.h>

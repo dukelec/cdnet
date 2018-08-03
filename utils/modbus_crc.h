@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -11,7 +11,7 @@
 #ifndef __MODBUS_CRC_H__
 #define __MODBUS_CRC_H__
 
-#include "common.h"
+#include "cd_utils.h"
 
 extern const uint16_t crc16_table[];
 

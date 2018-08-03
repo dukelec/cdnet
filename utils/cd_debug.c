@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -9,12 +9,13 @@
  *                          how-do-i-use-the-printf-function-on-stm32
  */
 
-#include "common.h"
+#include "cd_utils.h"
+#include "cd_list.h"
 
 extern uart_t debug_uart;
 
-#ifndef LINE_LEN
-    #define LINE_LEN    80
+#ifndef DBG_STR_LEN
+    #define DBG_STR_LEN 80
 #endif
 #ifndef DBG_LEN
     #define DBG_LEN     60
@@ -22,7 +23,7 @@ extern uart_t debug_uart;
 
 typedef struct {
     list_node_t node;
-    uint8_t data[LINE_LEN];
+    uint8_t data[DBG_STR_LEN];
     int len;
 } dbg_node_t;
 
@@ -43,7 +44,7 @@ void _dprintf(char* format, ...)
         va_list arg;
         va_start (arg, format);
         // WARN: stack may not enough for reentrant
-        buf->len = vsnprintf((char *)buf->data, LINE_LEN, format, arg);
+        buf->len = vsnprintf((char *)buf->data, DBG_STR_LEN, format, arg);
         va_end (arg);
         list_put_it(&dbg_tx, &buf->node);
     } else {
@@ -54,7 +55,7 @@ void _dprintf(char* format, ...)
     }
 }
 
-void dputs(char *str)
+void _dputs(char *str)
 {
     dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
     if (buf) {

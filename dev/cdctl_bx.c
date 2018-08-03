@@ -1,5 +1,5 @@
 /*
- * Software License Agreement (BSD License)
+ * Software License Agreement (MIT License)
  *
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
@@ -101,7 +101,7 @@ static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
     cdctl_write_reg(intf, REG_DIV_LS_H, l >> 8);
     cdctl_write_reg(intf, REG_DIV_HS_L, h & 0xff);
     cdctl_write_reg(intf, REG_DIV_HS_H, h >> 8);
-    dd_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
+    dn_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
 static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
@@ -157,7 +157,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 #endif
     intf->rst_n = rst_n;
 
-    dd_info(intf->name, "init...\n");
+    dn_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
         gpio_set_value(rst_n, 1);
@@ -176,14 +176,14 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         }
         debug_flush();
     }
-    dd_info(intf->name, "version: %02x\n", last_ver);
+    dn_info(intf->name, "version: %02x\n", last_ver);
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
     cdctl_set_filter(&intf->cd_intf, filter);
     cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
     cdctl_flush(&intf->cd_intf);
 
-    dd_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
+    dn_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
 }
 
 // handlers
@@ -194,19 +194,19 @@ void cdctl_task(cdctl_intf_t *intf)
     uint8_t flags = cdctl_read_reg(intf, REG_INT_FLAG);
 
     if (flags & BIT_FLAG_RX_LOST) {
-        dd_error(intf->name, "BIT_FLAG_RX_LOST\n");
+        dn_error(intf->name, "BIT_FLAG_RX_LOST\n");
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_LOST);
     }
     if (flags & BIT_FLAG_RX_ERROR) {
-        dd_warn(intf->name, "BIT_FLAG_RX_ERROR\n");
+        dn_warn(intf->name, "BIT_FLAG_RX_ERROR\n");
         cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_CLR_ERROR);
     }
     if (flags & BIT_FLAG_TX_CD) {
-        dd_debug(intf->name, "BIT_FLAG_TX_CD\n");
+        dn_debug(intf->name, "BIT_FLAG_TX_CD\n");
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_CD);
     }
     if (flags & BIT_FLAG_TX_ERROR) {
-        dd_error(intf->name, "BIT_FLAG_TX_ERROR\n");
+        dn_error(intf->name, "BIT_FLAG_TX_ERROR\n");
         cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_CLR_ERROR);
     }
 
@@ -219,11 +219,11 @@ void cdctl_task(cdctl_intf_t *intf)
 #ifdef VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-            dd_verbose(intf->name, "-> [%s]\n", pbuf);
+            dn_verbose(intf->name, "-> [%s]\n", pbuf);
 #endif
             list_put(&intf->rx_head, &frame->node);
         } else {
-            dd_error(intf->name, "get_rx, no free frame\n");
+            dn_error(intf->name, "get_rx, no free frame\n");
         }
     }
 
@@ -239,7 +239,7 @@ void cdctl_task(cdctl_intf_t *intf)
 #ifdef VERBOSE
         char pbuf[52];
         hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-        dd_verbose(intf->name, "<- [%s]%s\n",
+        dn_verbose(intf->name, "<- [%s]%s\n",
                 pbuf, intf->is_pending ? " (p)" : "");
 #endif
         list_put(intf->free_head, &frame->node);
@@ -248,7 +248,7 @@ void cdctl_task(cdctl_intf_t *intf)
     if (intf->is_pending) {
         flags = cdctl_read_reg(intf, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
-            dd_verbose(intf->name, "trigger pending tx\n");
+            dn_verbose(intf->name, "trigger pending tx\n");
             cdctl_write_reg(intf, REG_TX_CTRL, BIT_TX_START);
             intf->is_pending = false;
         }
