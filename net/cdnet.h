@@ -108,6 +108,9 @@ typedef struct cd_intf {
     void    (* set_filter)(struct cd_intf *intf, uint8_t filter);
     uint8_t (* get_filter)(struct cd_intf *intf);
 
+    void    (* set_tx_wait)(struct cd_intf *intf, uint8_t len);
+    uint8_t (* get_tx_wait)(struct cd_intf *intf);
+
     void    (* flush)(struct cd_intf *intf);
 } cd_intf_t;
 

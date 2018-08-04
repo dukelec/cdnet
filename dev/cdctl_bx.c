@@ -81,13 +81,24 @@ static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     cdctl_write_reg(intf, REG_FILTER, filter);
-    cdctl_write_reg(intf, REG_TX_WAIT_LEN, min(255, filter + 1));
 }
 
 static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
 {
     cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     return cdctl_read_reg(intf, REG_FILTER);
+}
+
+static void cdctl_set_tx_wait(cd_intf_t *cd_intf, uint8_t len)
+{
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    cdctl_write_reg(intf, REG_TX_WAIT_LEN, max(1, len));
+}
+
+static uint8_t cdctl_get_tx_wait(cd_intf_t *cd_intf)
+{
+    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
+    return cdctl_read_reg(intf, REG_TX_WAIT_LEN);
 }
 
 static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
@@ -140,6 +151,8 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->cd_intf.put_tx_frame = cdctl_put_tx_frame;
     intf->cd_intf.set_filter = cdctl_set_filter;
     intf->cd_intf.get_filter = cdctl_get_filter;
+    intf->cd_intf.set_tx_wait = cdctl_set_tx_wait;
+    intf->cd_intf.get_tx_wait = cdctl_get_tx_wait;
     intf->cd_intf.set_baud_rate = cdctl_set_baud_rate;
     intf->cd_intf.get_baud_rate = cdctl_get_baud_rate;
     intf->cd_intf.flush = cdctl_flush;
