@@ -13,7 +13,9 @@
 #include "cdnet.h"
 
 typedef enum {
-    CDCTL_IDLE = 0,
+    CDCTL_RST = 0,
+
+    CDCTL_IDLE,
     CDCTL_WAIT_TX_CLEAN,
     CDCTL_RD_FLAG,
 

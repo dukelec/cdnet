@@ -173,7 +173,9 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     dn_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
+        delay_systick(2000/SYSTICK_US_DIV);
         gpio_set_value(rst_n, 1);
+        delay_systick(2000/SYSTICK_US_DIV);
     }
 
     uint8_t last_ver = 0xff;
@@ -202,7 +204,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 // handlers
 
 
-void cdctl_task(cdctl_intf_t *intf)
+void cdctl_routine(cdctl_intf_t *intf)
 {
     uint8_t flags = cdctl_read_reg(intf, REG_INT_FLAG);
 

@@ -333,7 +333,7 @@ void cdnet_seq_rx_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt)
     }
 }
 
-void cdnet_seq_tx_task(cdnet_intf_t *intf)
+void cdnet_seq_tx_routine(cdnet_intf_t *intf)
 {
     list_node_t     *pre, *cur;
     // TODO: add support for multicast with seq_num:

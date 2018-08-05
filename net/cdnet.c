@@ -23,7 +23,7 @@ void cdnet_seq_init(cdnet_intf_t *intf);
 void cdnet_p0_request_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 void cdnet_p0_reply_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt);
 void cdnet_seq_rx_handle(cdnet_intf_t *intf, cdnet_packet_t *pkt);
-void cdnet_seq_tx_task(cdnet_intf_t *intf);
+void cdnet_seq_tx_routine(cdnet_intf_t *intf);
 
 
 void cdnet_intf_init(cdnet_intf_t *intf, list_head_t *free_head,
@@ -150,5 +150,5 @@ void cdnet_rx(cdnet_intf_t *intf)
 
 void cdnet_tx(cdnet_intf_t *intf)
 {
-    cdnet_seq_tx_task(intf);
+    cdnet_seq_tx_routine(intf);
 }

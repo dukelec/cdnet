@@ -154,5 +154,10 @@ static inline uint32_t get_systick(void)
     return HAL_GetTick();
 }
 
+static inline void delay_systick(uint32_t val)
+{
+    HAL_Delay(val);
+}
+
 #endif
 

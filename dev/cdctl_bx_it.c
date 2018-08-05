@@ -20,7 +20,7 @@ static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
 {
     uint8_t dat = 0xff;
     intf->manual_ctrl = true;
-    while (intf->state != CDCTL_IDLE);
+    while (intf->state > CDCTL_IDLE);
     spi_mem_read(intf->spi, reg, &dat, 1);
     intf->manual_ctrl = false;
     if (!gpio_get_value(intf->int_n)) {
@@ -34,7 +34,7 @@ static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
 static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
 {
     intf->manual_ctrl = true;
-    while (intf->state != CDCTL_IDLE);
+    while (intf->state > CDCTL_IDLE);
     spi_mem_write(intf->spi, reg | 0x80, &val, 1);
     intf->manual_ctrl = false;
     if (!gpio_get_value(intf->int_n)) {
@@ -158,7 +158,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->cd_intf.flush = cdctl_flush;
 
 #ifdef USE_DYNAMIC_INIT
-    intf->state = CDCTL_IDLE;
+    intf->state = CDCTL_RST;
     intf->manual_ctrl = false;
     list_head_init(&intf->rx_head);
     list_head_init(&intf->tx_head);
@@ -180,7 +180,9 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     dn_info(intf->name, "init...\n");
     if (rst_n) {
         gpio_set_value(rst_n, 0);
+        delay_systick(2000/SYSTICK_US_DIV);
         gpio_set_value(rst_n, 1);
+        delay_systick(2000/SYSTICK_US_DIV);
     }
 
     uint8_t last_ver = 0xff;
@@ -205,6 +207,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
 
     dn_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
     cdctl_write_reg(intf, REG_INT_MASK, CDCTL_MASK);
+    intf->state = CDCTL_IDLE;
     // enable int_n interrupt at outside
 }
 

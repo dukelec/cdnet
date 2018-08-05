@@ -41,7 +41,7 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
         spi_t *spi, gpio_t *rst_n);
 #endif
 
-void cdctl_task(cdctl_intf_t *intf);
+void cdctl_routine(cdctl_intf_t *intf);
 
 #endif
 
