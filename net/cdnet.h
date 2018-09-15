@@ -17,6 +17,9 @@
 #ifndef CDNET_DEF_PORT
 #define CDNET_DEF_PORT      0xcdcd
 #endif
+#ifndef CDNET_LOCAL_PORT    // ephemeral port start
+#define CDNET_LOCAL_PORT    32768
+#endif
 
 #ifndef CDNET_DAT_SIZE
 #define CDNET_DAT_SIZE      252

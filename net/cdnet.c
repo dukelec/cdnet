@@ -129,7 +129,7 @@ void cdnet_rx(cdnet_intf_t *intf)
         }
 
         if (pkt->level != CDNET_L2) {
-            if (pkt->dst_port == 0 && pkt->src_port >= CDNET_DEF_PORT) {
+            if (pkt->dst_port == 0 && pkt->src_port >= CDNET_LOCAL_PORT) {
                 cdnet_p0_request_handle(intf, pkt);
                 continue;
             }
