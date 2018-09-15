@@ -97,24 +97,10 @@ typedef struct {
 } cd_frame_t;
 
 typedef struct cd_intf {
-
     cd_frame_t *(* get_free_frame)(struct cd_intf *cd_intf);
     cd_frame_t *(* get_rx_frame)(struct cd_intf *cd_intf);
     void (* put_free_frame)(struct cd_intf *cd_intf, cd_frame_t *frame);
     void (* put_tx_frame)(struct cd_intf *cd_intf, cd_frame_t *frame);
-
-    // cdbus has two baud rates
-    void  (* set_baud_rate)(struct cd_intf *intf, uint32_t, uint32_t);
-    void  (* get_baud_rate)(struct cd_intf *intf, uint32_t *, uint32_t *);
-
-    // 255 for promiscuous mode
-    void    (* set_filter)(struct cd_intf *intf, uint8_t filter);
-    uint8_t (* get_filter)(struct cd_intf *intf);
-
-    void    (* set_tx_wait)(struct cd_intf *intf, uint8_t len);
-    uint8_t (* get_tx_wait)(struct cd_intf *intf);
-
-    void    (* flush)(struct cd_intf *intf);
 } cd_intf_t;
 
 

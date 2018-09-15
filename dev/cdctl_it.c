@@ -7,8 +7,7 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#include "cdctl_bx_it.h"
-#include "cdctl_bx_regs.h"
+#include "cdctl_it.h"
 
 #define CDCTL_MASK (BIT_FLAG_RX_PENDING |           \
             BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
@@ -16,7 +15,7 @@
 
 
 // used by init and user configuration
-static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
+uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
 {
     uint8_t dat = 0xff;
     intf->manual_ctrl = true;
@@ -31,7 +30,7 @@ static uint8_t cdctl_read_reg(cdctl_intf_t *intf, uint8_t reg)
     }
     return dat;
 }
-static void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
+void cdctl_write_reg(cdctl_intf_t *intf, uint8_t reg, uint8_t val)
 {
     intf->manual_ctrl = true;
     while (intf->state > CDCTL_IDLE);
@@ -79,35 +78,9 @@ void cdctl_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
 }
 
 
-static void cdctl_set_filter(cd_intf_t *cd_intf, uint8_t filter)
-{
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(intf, REG_FILTER, filter);
-}
-
-static uint8_t cdctl_get_filter(cd_intf_t *cd_intf)
-{
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return cdctl_read_reg(intf, REG_FILTER);
-}
-
-static void cdctl_set_tx_wait(cd_intf_t *cd_intf, uint8_t len)
-{
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(intf, REG_TX_WAIT_LEN, max(1, len));
-}
-
-static uint8_t cdctl_get_tx_wait(cd_intf_t *cd_intf)
-{
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    return cdctl_read_reg(intf, REG_TX_WAIT_LEN);
-}
-
-static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
-        uint32_t low, uint32_t high)
+void cdctl_set_baud_rate(cdctl_intf_t *intf, uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     l = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, low) - 1;
     h = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, high) - 1;
     cdctl_write_reg(intf, REG_DIV_LS_L, l & 0xff);
@@ -117,23 +90,15 @@ static void cdctl_set_baud_rate(cd_intf_t *cd_intf,
     dn_debug(intf->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
-static void cdctl_get_baud_rate(cd_intf_t *cd_intf,
-        uint32_t *low, uint32_t *high)
+void cdctl_get_baud_rate(cdctl_intf_t *intf, uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
     l = cdctl_read_reg(intf, REG_DIV_LS_L) |
             cdctl_read_reg(intf, REG_DIV_LS_H) << 8;
     h = cdctl_read_reg(intf, REG_DIV_HS_L) |
             cdctl_read_reg(intf, REG_DIV_HS_H) << 8;
     *low = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, l + 1);
     *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
-}
-
-static void cdctl_flush(cd_intf_t *cd_intf)
-{
-    cdctl_intf_t *intf = container_of(cd_intf, cdctl_intf_t, cd_intf);
-    cdctl_write_reg(intf, REG_RX_CTRL, BIT_RX_RST);
 }
 
 
@@ -149,13 +114,6 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     intf->cd_intf.get_rx_frame = cdctl_get_rx_frame;
     intf->cd_intf.put_free_frame = cdctl_put_free_frame;
     intf->cd_intf.put_tx_frame = cdctl_put_tx_frame;
-    intf->cd_intf.set_filter = cdctl_set_filter;
-    intf->cd_intf.get_filter = cdctl_get_filter;
-    intf->cd_intf.set_tx_wait = cdctl_set_tx_wait;
-    intf->cd_intf.get_tx_wait = cdctl_get_tx_wait;
-    intf->cd_intf.set_baud_rate = cdctl_set_baud_rate;
-    intf->cd_intf.get_baud_rate = cdctl_get_baud_rate;
-    intf->cd_intf.flush = cdctl_flush;
 
 #ifdef USE_DYNAMIC_INIT
     intf->state = CDCTL_RST;
@@ -201,9 +159,9 @@ void cdctl_intf_init(cdctl_intf_t *intf, list_head_t *free_head,
     dn_info(intf->name, "version: %02x\n", last_ver);
 
     cdctl_write_reg(intf, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
-    cdctl_set_filter(&intf->cd_intf, filter);
-    cdctl_set_baud_rate(&intf->cd_intf, baud_l, baud_h);
-    cdctl_flush(&intf->cd_intf);
+    cdctl_write_reg(intf, REG_FILTER, filter);
+    cdctl_set_baud_rate(intf, baud_l, baud_h);
+    cdctl_flush(intf);
 
     dn_debug(intf->name, "flags: %02x\n", cdctl_read_reg(intf, REG_INT_FLAG));
     cdctl_write_reg(intf, REG_INT_MASK, CDCTL_MASK);

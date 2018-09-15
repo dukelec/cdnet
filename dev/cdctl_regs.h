@@ -7,11 +7,11 @@
  * Author: Duke Fong <duke@dukelec.com>
  */
 
-#ifndef __CDCTL_BX_REGS_H__
-#define __CDCTL_BX_REGS_H__
+#ifndef __CDCTL_REGS_H__
+#define __CDCTL_REGS_H__
 
 #ifndef CDCTL_SYS_CLK
-#define CDCTL_SYS_CLK       40000000UL // 40MHz
+#define CDCTL_SYS_CLK       40000000UL // 40MHz for CDCTL-Bx
 #endif
 
 #define REG_VERSION         0x00
@@ -31,6 +31,8 @@
 #define REG_TX_CTRL         0x0e
 #define REG_RX_ADDR         0x0f
 #define REG_RX_PAGE_FLAG    0x10
+#define REG_FILTER1         0x11    // multicast filter
+#define REG_FILTER2         0x12
 
 
 #define BIT_SETTING_TX_PUSH_PULL    (1 << 0)
@@ -39,6 +41,7 @@
 #define BIT_SETTING_NO_DROP         (1 << 3)
 #define POS_SETTING_TX_EN_DELAY           4
 #define BIT_SETTING_NO_ARBITRATE    (1 << 6)
+#define BIT_SETTING_FULL_DUPLEX     (1 << 7)
 
 #define BIT_FLAG_BUS_IDLE           (1 << 0)
 #define BIT_FLAG_RX_PENDING         (1 << 1)

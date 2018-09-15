@@ -63,7 +63,6 @@ void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head)
     list_head_init(&intf->tx_head);
     intf->rx_byte_cnt = 0;
 
-    intf->cd_intf.set_filter = NULL;
     // filters should set by caller
     intf->remote_filter_len = 0;
     intf->local_filter_len = 0;
