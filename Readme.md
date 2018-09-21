@@ -7,6 +7,7 @@ CDNET is a high layer protocol for CDBUS
 4. [Level 2 Format](#level-2-format)
 5. [Specific Ports](#specific-ports)
 6. [Examples](#examples)
+7. [More Resources](#more-resources)
 
 
 ## CDNET Levels
@@ -300,4 +301,11 @@ The Level 1 Format:
 
 How to use this library refer to `stepper_motor_controller`, `cdbus_bridge` or `cdnet_tun` projects;  
 How to control CDCTL-Bx/Hx refer to `dev/cdctl_xxx`.
+
+
+## More Resources
+
+Python library for CDNET: ../pycdnet
+
+TODO: This C library will update to the same architecture as the python library, especially to use the short ipv6 like address instead.
 
