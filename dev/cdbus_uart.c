@@ -19,59 +19,59 @@
 
 // member functions
 
-static cd_frame_t *cduart_get_free_frame(cd_intf_t *cd_intf)
+static cd_frame_t *cduart_get_free_frame(cd_dev_t *cd_dev)
 {
-    cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    return cduart_frame_get(intf->free_head);
+    cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
+    return cduart_frame_get(dev->free_head);
 }
 
-static cd_frame_t *cduart_get_rx_frame(cd_intf_t *cd_intf)
+static cd_frame_t *cduart_get_rx_frame(cd_dev_t *cd_dev)
 {
-    cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    return cduart_frame_get(&intf->rx_head);
+    cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
+    return cduart_frame_get(&dev->rx_head);
 }
 
-static void cduart_put_free_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
+static void cduart_put_free_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
-    cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_list_put(intf->free_head, &frame->node);
+    cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
+    cduart_list_put(dev->free_head, &frame->node);
 }
 
-static void cduart_put_tx_frame(cd_intf_t *cd_intf, cd_frame_t *frame)
+static void cduart_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
-    cduart_intf_t *intf = container_of(cd_intf, cduart_intf_t, cd_intf);
-    cduart_list_put(&intf->tx_head, &frame->node);
+    cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
+    cduart_list_put(&dev->tx_head, &frame->node);
 }
 
 
-void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head)
+void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
 {
-    if (!intf->name)
-        intf->name = "cduart";
-    intf->rx_frame = list_get_entry(free_head, cd_frame_t);
-    intf->free_head = free_head;
-    intf->cd_intf.get_free_frame = cduart_get_free_frame;
-    intf->cd_intf.get_rx_frame = cduart_get_rx_frame;
-    intf->cd_intf.put_free_frame = cduart_put_free_frame;
-    intf->cd_intf.put_tx_frame = cduart_put_tx_frame;
+    if (!dev->name)
+        dev->name = "cduart";
+    dev->rx_frame = list_get_entry(free_head, cd_frame_t);
+    dev->free_head = free_head;
+    dev->cd_dev.get_free_frame = cduart_get_free_frame;
+    dev->cd_dev.get_rx_frame = cduart_get_rx_frame;
+    dev->cd_dev.put_free_frame = cduart_put_free_frame;
+    dev->cd_dev.put_tx_frame = cduart_put_tx_frame;
 
-    intf->t_last = get_systick();
-    intf->rx_crc = 0xffff;
+    dev->t_last = get_systick();
+    dev->rx_crc = 0xffff;
 
 #ifdef USE_DYNAMIC_INIT
-    list_head_init(&intf->rx_head);
-    list_head_init(&intf->tx_head);
-    intf->rx_byte_cnt = 0;
+    list_head_init(&dev->rx_head);
+    list_head_init(&dev->tx_head);
+    dev->rx_byte_cnt = 0;
 
     // filters should set by caller
-    intf->remote_filter_len = 0;
-    intf->local_filter_len = 0;
+    dev->remote_filter_len = 0;
+    dev->local_filter_len = 0;
 #endif
 }
 
 // handler
 
-static bool rx_match_filter(cduart_intf_t *intf,
+static bool rx_match_filter(cduart_dev_t *dev,
         cd_frame_t *frame, bool test_remote)
 {
     uint8_t i;
@@ -81,12 +81,12 @@ static bool rx_match_filter(cduart_intf_t *intf,
     bool is_match = false;
 
     if (test_remote) {
-        filter = intf->remote_filter;
-        filter_len = intf->remote_filter_len;
+        filter = dev->remote_filter;
+        filter_len = dev->remote_filter_len;
         val = frame->dat[0];
     } else {
-        filter = intf->local_filter;
-        filter_len = intf->local_filter_len;
+        filter = dev->local_filter;
+        filter_len = dev->local_filter_len;
         val = frame->dat[1];
     }
 
@@ -99,7 +99,7 @@ static bool rx_match_filter(cduart_intf_t *intf,
     return is_match;
 }
 
-void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
+void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
 {
     int i;
     int max_len;
@@ -107,64 +107,64 @@ void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len)
     const uint8_t *rd = buf;
 
     while (true) {
-        cd_frame_t *frame = intf->rx_frame;
+        cd_frame_t *frame = dev->rx_frame;
 
         if (!len || rd == buf + len)
             return;
         max_len = buf + len - rd;
 
-        if (intf->rx_byte_cnt != 0 &&
-                get_systick() - intf->t_last > CDUART_IDLE_TIME) {
-            dn_warn(intf->name, "drop timeout, cnt: %d\n", intf->rx_byte_cnt);
-            intf->rx_byte_cnt = 0;
-            intf->rx_crc = 0xffff;
+        if (dev->rx_byte_cnt != 0 &&
+                get_systick() - dev->t_last > CDUART_IDLE_TIME) {
+            dn_warn(dev->name, "drop timeout, cnt: %d\n", dev->rx_byte_cnt);
+            dev->rx_byte_cnt = 0;
+            dev->rx_crc = 0xffff;
         }
-        intf->t_last = get_systick();
+        dev->t_last = get_systick();
 
-        if (intf->rx_byte_cnt < 3)
-            cpy_len = min(3 - intf->rx_byte_cnt, max_len);
+        if (dev->rx_byte_cnt < 3)
+            cpy_len = min(3 - dev->rx_byte_cnt, max_len);
         else
-            cpy_len = min(frame->dat[2] + 5 - intf->rx_byte_cnt, max_len);
+            cpy_len = min(frame->dat[2] + 5 - dev->rx_byte_cnt, max_len);
 
-        memcpy(frame->dat + intf->rx_byte_cnt, rd, cpy_len);
-        intf->rx_byte_cnt += cpy_len;
+        memcpy(frame->dat + dev->rx_byte_cnt, rd, cpy_len);
+        dev->rx_byte_cnt += cpy_len;
 
-        if (intf->rx_byte_cnt <= 3 &&
-                ((intf->rx_byte_cnt >= 2 &&
-                        !rx_match_filter(intf, frame, false)) ||
-                        (intf->rx_byte_cnt >= 1 &&
-                                !rx_match_filter(intf, frame, true)))) {
-            dn_warn(intf->name, "filtered, len: %d, [%02x, %02x ...]\n",
-                    intf->rx_byte_cnt, frame->dat[0], frame->dat[1]);
-            intf->rx_byte_cnt = 0;
-            intf->rx_crc = 0xffff;
+        if (dev->rx_byte_cnt <= 3 &&
+                ((dev->rx_byte_cnt >= 2 &&
+                        !rx_match_filter(dev, frame, false)) ||
+                        (dev->rx_byte_cnt >= 1 &&
+                                !rx_match_filter(dev, frame, true)))) {
+            dn_warn(dev->name, "filtered, len: %d, [%02x, %02x ...]\n",
+                    dev->rx_byte_cnt, frame->dat[0], frame->dat[1]);
+            dev->rx_byte_cnt = 0;
+            dev->rx_crc = 0xffff;
             return;
         }
 
         for (i = 0; i < cpy_len; i++)
-            crc16_byte(*(rd + i), &intf->rx_crc);
+            crc16_byte(*(rd + i), &dev->rx_crc);
         rd += cpy_len;
 
-        if (intf->rx_byte_cnt == frame->dat[2] + 5) {
-            if (intf->rx_crc != 0) {
-                dn_error(intf->name, "crc error\n");
+        if (dev->rx_byte_cnt == frame->dat[2] + 5) {
+            if (dev->rx_crc != 0) {
+                dn_error(dev->name, "crc error\n");
             } else {
-                cd_frame_t *frm = cduart_frame_get(intf->free_head);
+                cd_frame_t *frm = cduart_frame_get(dev->free_head);
                 if (frm) {
 #ifdef VERBOSE
                     char pbuf[52];
                     hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-                    dn_verbose(intf->name, "-> [%s]\n", pbuf);
+                    dn_verbose(dev->name, "-> [%s]\n", pbuf);
 #endif
-                    cduart_list_put(&intf->rx_head, &intf->rx_frame->node);
-                    intf->rx_frame = frm;
+                    cduart_list_put(&dev->rx_head, &dev->rx_frame->node);
+                    dev->rx_frame = frm;
                 } else {
                     // set rx_lost flag
-                    dn_error(intf->name, "rx_lost\n");
+                    dn_error(dev->name, "rx_lost\n");
                 }
             }
-            intf->rx_byte_cnt = 0;
-            intf->rx_crc = 0xffff;
+            dev->rx_byte_cnt = 0;
+            dev->rx_crc = 0xffff;
         }
     }
 }

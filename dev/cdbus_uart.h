@@ -10,15 +10,15 @@
 #ifndef __CDBUS_UART_H__
 #define __CDBUS_UART_H__
 
-#include "cdnet.h"
+#include "cdbus.h"
 #include "modbus_crc.h"
 
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
 
-typedef struct cduart_intf {
-    cd_intf_t           cd_intf;
+typedef struct cduart_dev {
+    cd_dev_t            cd_dev;
     const char          *name;
 
     list_head_t         *free_head;
@@ -34,11 +34,11 @@ typedef struct cduart_intf {
     uint8_t             remote_filter[8];
     uint8_t             local_filter_len;
     uint8_t             remote_filter_len;
-} cduart_intf_t;
+} cduart_dev_t;
 
 
-void cduart_intf_init(cduart_intf_t *intf, list_head_t *free_head);
-void cduart_rx_handle(cduart_intf_t *intf, const uint8_t *buf, int len);
+void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head);
+void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len);
 
 static inline void cduart_fill_crc(uint8_t *dat)
 {
