@@ -307,5 +307,5 @@ How to control CDCTL-Bx/Hx refer to `dev/cdctl_xxx`.
 
 Python library for CDNET: ../pycdnet
 
-TODO: This C library will update to the same architecture as the python library, especially to use the short ipv6 like address instead.
+CDNET address string format: [parser/cdnet.h](parser/cdnet.h)
 

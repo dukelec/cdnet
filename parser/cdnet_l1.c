@@ -131,8 +131,7 @@ int cdnet_l1_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
     return 0;
 }
 
-int cdnet_l1_from_frame(const uint8_t *frame,
-        uint8_t local_net, uint16_t last_port,
+int cdnet_l1_from_frame(const uint8_t *frame, uint8_t local_net,
         cd_sockaddr_t *src, cd_sockaddr_t *dst, uint8_t *dat, uint8_t *len,
         uint8_t *seq_val)
 {

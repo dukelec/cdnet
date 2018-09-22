@@ -98,6 +98,36 @@ typedef struct {
 } cd_sockaddr_t;
 
 
+static inline void cdnet_set_addr(cd_addr_t *addr,
+        uint8_t type, uint8_t net, uint8_t mac)
+{
+    addr->cd_addr_type = type;
+    addr->cd_addr_net = net;
+    addr->cd_addr_mac = mac;
+}
+
+static inline void cdnet_set_addr_mcast(cd_addr_t *addr,
+        uint8_t type, uint16_t m_id)
+{
+    addr->cd_addr_type = type;
+    addr->cd_addr_m_id = m_id;
+}
+
+static inline void cdnet_set_sockaddr(cd_sockaddr_t *addr,
+        uint8_t type, uint8_t net, uint8_t mac, uint16_t port)
+{
+    cdnet_set_addr(&addr->addr, type, net, mac);
+    addr->port = port;
+}
+
+static inline void cdnet_set_sockaddr_mcast(cd_sockaddr_t *addr,
+        uint8_t type, uint16_t m_id, uint16_t port)
+{
+    cdnet_set_addr_mcast(&addr->addr, type, m_id);
+    addr->port = port;
+}
+
+
 int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
         const uint8_t *dat, uint8_t len, bool allow_share, uint8_t *frame);
 
@@ -109,8 +139,7 @@ int cdnet_l1_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
         const uint8_t *dat, uint8_t len, uint8_t src_mac,
         uint8_t seq_val, uint8_t *frame);
 
-int cdnet_l1_from_frame(const uint8_t *frame,
-        uint8_t local_net, uint16_t last_port,
+int cdnet_l1_from_frame(const uint8_t *frame, uint8_t local_net,
         cd_sockaddr_t *src, cd_sockaddr_t *dst, uint8_t *dat, uint8_t *len,
         uint8_t *seq_val);
 
