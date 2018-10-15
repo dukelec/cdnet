@@ -15,7 +15,7 @@ int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
 {
     uint8_t *buf = frame;
 
-    assert(dst->addr.cd_addr_type == 0x00 || dst->addr.cd_addr_type == 0x08);
+    assert(dst->addr.cd_addr_type == 0x00);
     assert((src->port == CDNET_DEF_PORT && dst->port <= 63) ||
             dst->port == CDNET_DEF_PORT);
 
@@ -27,9 +27,9 @@ int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
                                     // backup dst port if need at outside
         *buf++ = dst->port; // hdr
     } else { // out reply
-        if (len >= 1 && dat[0] <= 31) {
+        if (len >= 1 && (dat[0] & L0_SHARE_MASK) == L0_SHARE_LEFT) {
             // share first byte
-            *buf++ = HDR_L0_REPLY | HDR_L0_SHARE | dat[0];
+            *buf++ = HDR_L0_REPLY | HDR_L0_SHARE | (dat[0] & ~L0_SHARE_MASK);
             len--;
             dat++;
         } else {
@@ -68,7 +68,7 @@ int cdnet_l0_from_frame(const uint8_t *frame,
         dst->port = CDNET_DEF_PORT;
         if (*hdr & HDR_L0_SHARE) {
             (*len)--;
-            *dat++ = *hdr & 0x1f;
+            *dat++ = (*hdr & 0x1f) | L0_SHARE_LEFT;
         }
     } else { // in request
         src->port = CDNET_DEF_PORT;

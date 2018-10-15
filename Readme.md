@@ -31,57 +31,76 @@ The CDNET is little endian.
 First byte:
 
 | FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
+|-------- |---------------------------------------------------|
 | [7]     | Always 0: Level 0                                 |
 | [6]     | Always 0: request                                 |
 | [5:0]   | dst_port, range 0~63                              |
 
-Note: The port is equivalent to UDP port, but can be simply understood as commands.
-
 The second byte and after: command parameters.
+
+Note: The port is equivalent to UDP port, but can be simply understood as commands.
 
 ### Reply
 First byte:
 
 | FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
+|-------- |---------------------------------------------------|
 | [7]     | Always 0: Level 0                                 |
 | [6]     | Always 1: reply                                   |
-| [5]     | 0: not share; 1: [4:0] shared as first data byte  |
-| [4:0]   | Not care, or first data byte (must ≤ 31)          |
+| [5]     | 0: not share; 1: [4:0] shared for first data byte |
+| [4:0]   | Not care, or part of first data byte              |
 
-E.g.: reply `[0x40, 0x0c]` is the same as `[0x6c]`.
+Default: `SHARE_MASK` is 0xe0, `SHARE_LEFT` is 0x80,
+only allow share if (`first data byte` & `SHARE_MASK`) == `SHARE_LEFT`.
+
+E.g.: reply `[0x40, 0x8c]` is the same as `[0x6c]`.
 ```
 0x40: 'b0100_0000
-0x0c: 'b0000_1100
+0x8c: 'b1000_1100
 ----
 0x6c: 'b0110_1100
 ```
 
 The first byte shared part, and the second byte and after: reply status and/or datas.
 
+
+### Recommendation for level 0 and 1:
+For request and report, the first parameter byte is sub command with two flags:
+
+| FIELD   | DESCRIPTION                     |
+|-------- |---------------------------------|
+| [7]     | is_reply, always 0              |
+| [6]     | need_reply, always 0 for report |
+| [5:0]   | sub command                     |
+
+For reply, the first data byte is status with one flag:
+
+| FIELD   | DESCRIPTION                     |
+|-------- |---------------------------------|
+| [7]     | is_reply, always 1              |
+| [6:0]   | status, 0 means no error        |
+
+
 ## Level 1 Format
 First byte:
 
-| FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
-| [7]     | Always 1                                          |
-| [6]     | Always 0                                          |
-| [5]     | MULTI_NET                                         |
-| [4]     | MULTICAST                                         |
-| [3]     | SEQUENCE                                          |
-| [2:0]   | PORT_SIZE                                         |
-
-Notes: All fields reserved in this document must be 0.
+| FIELD   | DESCRIPTION                     |
+|-------- |---------------------------------|
+| [7]     | Always 1                        |
+| [6]     | Always 0                        |
+| [5]     | MULTI_NET                       |
+| [4]     | MULTICAST                       |
+| [3]     | SEQUENCE                        |
+| [2:0]   | PORT_SIZE                       |
 
 ### MULTI_NET & MULTICAST
 
-| MULTI_NET | MULTICAST | DESCRIPTION                                                                       |
-|-----------|-----------|-----------------------------------------------------------------------------------| 
-| 0         | 0         | Local net: append 0 byte                                                          |
-| 0         | 1         | Local net multicast: append 2 bytes `[multicast-id]`                              |
-| 1         | 0         | Cross net: append 4 bytes: `[src_net, src_mac, dst_net, dst_mac]`                 |
-| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, multicast-id]`           |
+| MULTI_NET | MULTICAST | DESCRIPTION                                                               |
+|-----------|-----------|---------------------------------------------------------------------------|
+| 0         | 0         | Local net: append 0 byte                                                  |
+| 0         | 1         | Local net multicast: append 2 bytes `[multicast-id]`                      |
+| 1         | 0         | Cross net: append 4 bytes: `[src_net, src_mac, dst_net, dst_mac]`         |
+| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, multicast-id]`   |
 
 Notes:
  - Broadcast could simply not use the MULTICAST bit.
@@ -112,22 +131,22 @@ Notes:
 ## Level 2 Format
 First byte:
 
-| FIELD   | DESCRIPTION                                       |
-|-------- |---------------------------------------------------| 
-| [7]     | Always 1                                          |
-| [6]     | Always 1                                          |
-| [5:4]   | FRAGMENT                                          |
-| [3]     | SEQUENCE                                          |
-| [2:0]   | User-defined flag                                 |
+| FIELD   | DESCRIPTION                     |
+|-------- |---------------------------------|
+| [7]     | Always 1                        |
+| [6]     | Always 1                        |
+| [5:4]   | FRAGMENT                        |
+| [3]     | SEQUENCE                        |
+| [2:0]   | User-defined flag               |
 
 ### FRAGMENT:
 
-| Bit5 | Bit4   | DST_PORT              |
-|------|--------|-----------------------|
-| 0    | 0      | Not fragment          |
-| 0    | 1      | First fragment        |
-| 1    | 0      | More fragment         |
-| 1    | 1      | Last fragment         |
+| Bit5 | Bit4   | DST_PORT                  |
+|------|--------|---------------------------|
+| 0    | 0      | Not fragment              |
+| 0    | 1      | First fragment            |
+| 1    | 0      | More fragment             |
+| 1    | 1      | Last fragment             |
 
 Note:
  - `SEQUENCE` must be selected when using fragments.
@@ -157,16 +176,16 @@ Do not select `SEQUENCE` for port 0 communication self.
 Port 0 communications:
 ```
 Check the SEQ_NUM:
-  Write []
-  Return: [SEQ_NUM] (no record found if bit 7 set)
+  Write [0x40]
+  Return: [0x80, SEQ_NUM] (no record found if bit 7 set)
 
 Set the SEQ_NUM:
-  Write [0x00, SEQ_NUM]
-  Return: []
+  Write [0x60, SEQ_NUM]
+  Return: [0x80]
 
 Report SEQ_NUM:
-  Write [SEQ_NUM]
-  Return: None
+  Write [0x00, SEQ_NUM]
+  No Return
 ```
 
 Example:  
@@ -175,16 +194,16 @@ Example:
 ```
   Device A                      Device B        Description
 
-  [0x00, 0x00]          ->      Port0           Set SEQ_NUM at first time
-  Default port          <-      []              Set return
+  [0x60, 0x00]          ->      Port0           Set SEQ_NUM at first time
+                        <-      [0x80]          Set return
   [0x88, 0x00, ...]     >>                      Start send data
   [0x88, 0x01, ...]     >>
   [0x88, 0x82, ...]     >>                      Require report at SEQ_NUM 2
   [0x88, 0x03, ...]     >>
   [0x88, 0x04, ...]     >>
-  Port0                 <-      [0x03]          Report after receive SEQ_NUM 2
+  Port0                 <-      [0x00, 0x03]    Report after receive SEQ_NUM 2
   [0x88, 0x85, ...]     >>                      Require report at SEQ_NUM 5
-  Port0                 <-      [0x06]          Report after receive SEQ_NUM 5
+  Port0                 <-      [0x00, 0x06]    Report after receive SEQ_NUM 5
 ```
 
 
@@ -197,15 +216,15 @@ Type of max_time is uint16_t, unit: ms;
 Type of "string" is any length of string, include empty.
 
 Check device_info string:
-  Write []
-  Return ["device_info"]
+  Write [0x40]
+  Return [0x80, "device_info"]
 
 Search device by filters (need by mac auto allocation):
-  Write [max_time, mac_start, mac_end, "string"]
-  Return ["device_info"] after a random time in range [0, max_time]
+  Write [0x41, max_time, mac_start, mac_end, "string"]
+  Return [0x80, "device_info"] after a random time in range [0, max_time]
     only if "device_info" contain "string" (always true for empty string) and
     current mac address is in the range [mac_start, mac_end]
-  Return None otherwise
+  Not return otherwise
 ```
 Example of `device_info`:  
   `M: model; S: serial string; HW: hardware version; SW: software version` ...  
@@ -219,18 +238,18 @@ Type of baud_rate is uint32_t, e.g. 115200;
 Type of intf is uint8_t.
 
 Set current interface baud rate：
-  Write [0x00, baud_rate]                       // single baud rate
-  Write [0x00, baud_rate_low, baud_rate_high]   // dual baud rate
-  Return: []                                    // change baud rate after return
+  Write [0x60, baud_rate]                       // single baud rate
+  Write [0x61, baud_rate_low, baud_rate_high]   // dual baud rate
+  Return: [0x80]                                // change baud rate after return
 
 Set baud rate for specified interface:
-  Write [0x08, intf, baud_rate]
-  Write [0x08, intf, baud_rate_low, baud_rate_high]
-  Return: []
+  Write [0x62, intf, baud_rate]
+  Write [0x63, intf, baud_rate_low, baud_rate_high]
+  Return: [0x80]
 
 Check baud rate for specified interface:
-  Write [0x08, intf]
-  Return: [baud_rate] or [baud_rate_low, baud_rate_high]
+  Write [0x40, intf]
+  Return: [0x80, baud_rate] or [0x80, baud_rate_low, baud_rate_high]
 ```
 
 ### Port 3
@@ -242,33 +261,33 @@ Type of intf is uint8_t;
 Type of "string" is any length of string, include empty.
 
 Change mac address for current interface:
-  Write [0x00, new_mac, "string"]:              // "string" is optional (need by mac auto allocation)
-  Return [] if "device_info" contain "string"   // change mac address after return
-  Return None and ignore the command otherwise
+  Write [0x60, new_mac, "string"]:                  // "string" is optional (need by mac auto allocation)
+  Return [0x80] if "device_info" contain "string"   // change mac address after return
+  Not return and ignore the command otherwise
 
 Change net id for current interface:
-  Write [0x01, new_net]
-  Return: []                                    // change net id after return
+  Write [0x61, new_net]
+  Return: [0x80]                                    // change net id after return
 
 Check net id of current interface:
-  Write [0x01]
-  Return: [net]
+  Write [0x41]
+  Return: [0x80, net]
 
 Set mac address for specified interface:
-  Write [0x08, intf, new_mac]
-  Return: []
+  Write [0x68, intf, new_mac]
+  Return: [0x80]
 
 Set net id for specified interface:
-  Write [0x09, intf, new_net]
-  Return: []
+  Write [0x69, intf, new_net]
+  Return: [0x80]
 
 Check mac address for specified interface:
-  Write [0x08, intf]
-  Return: [mac]
+  Write [0x48, intf]
+  Return: [0x80, mac]
 
 Check net id for specified interface:
-  Write [0x09, intf]
-  Return: [net]
+  Write [0x49, intf]
+  Return: [0x80, net]
 ```
 
 
@@ -282,19 +301,23 @@ expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a
 
 The Level 0 Format:
  * Request:
-   - CDNET packet: `[0x01]` (`dst_port` = `0x01`, no arguments)
-   - CDBUS frame: `[0x0c, 0x0d, 0x01, 0x01, crc_l, crc_h]`
+   - CDNET socket: `[00:00:0c]:0xcdcd` -> `[00:00:0d]:1`: `0x40` (net id: `0`)
+   - CDNET packet: `[0x01, 0x40]` (`dst_port` = `0x01`)
+   - CDBUS frame: `[0x0c, 0x0d, 0x02, 0x01, 0x40, crc_l, crc_h]`
  * Reply:
-   - CDNET packet: `[0x40, 0x4d, 0x3a, 0x20 ... 0x34]` (`0x40`: first data byte not shared with the head)
-   - CDBUS frame: `[0x0d, 0x0c, 0x0f, 0x40, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
+   - CDNET socket: `[00:00:0d]:1` -> `[00:00:0c]:0xcdcd`: `0x80` + `"M: c1; S: 1234"`
+   - CDNET packet: `[0x60, 0x4d, 0x3a, 0x20 ... 0x34]` (first `0x60` is `0x40` + `0x80`)
+   - CDBUS frame: `[0x0d, 0x0c, 0x0f, 0x60, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
 
 The Level 1 Format:
  * Request:
-   - CDNET packet: `[0x80, 0x01]` (`src_port` = default, `dst_port` = `0x01`, no arguments)
-   - CDBUS frame: `[0x0c, 0x0d, 0x02, 0x80, 0x01, crc_l, crc_h]`
+   - CDNET socket: `[80:00:0c]:0xcdcd` -> `[80:00:0d]:1`: `0x40`
+   - CDNET packet: `[0x80, 0x01, 0x40]` (`src_port` = default, `dst_port` = `0x01`)
+   - CDBUS frame: `[0x0c, 0x0d, 0x03, 0x80, 0x01, 0x40, crc_l, crc_h]`
  * Reply:
-   - CDNET packet: `[0x82, 0x01, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x01`, `dst_port` = default)
-   - CDBUS frame: `[0x0d, 0x0c, 0x10, 0x82, 0x01, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
+   - CDNET socket: `[80:00:0d]:1` -> `[80:00:0c]:0xcdcd`: `0x80` + `"M: c1; S: 1234"`
+   - CDNET packet: `[0x82, 0x01, 0x80, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port` = `0x01`, `dst_port` = default)
+   - CDBUS frame: `[0x0d, 0x0c, 0x11, 0x82, 0x01, 0x80, 0x4d, 0x3a, 0x20 ... 0x34, crc_l, crc_h]`
 
 
 ### Code Examples

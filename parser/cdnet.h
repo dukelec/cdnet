@@ -11,14 +11,13 @@
  *
  *              local link     unique local    local and cross net multicast
  * level0:       00:NN:MM
- *  `-req reply: 08:NN:MM
  * level1:       80:NN:MM        a0:NN:MM     90:M_ID     b0:M_ID
  *  `-with seq:  88:NN:MM        a8:NN:MM     98:M_ID     b8:M_ID
  * level2:       c0:NN:MM
  *  `-with seq:  c8:NN:MM
- *                `-bit [2:0]: user-defined flag, level2 only
+ *
  * Notes:
- *   NN: net_id, MM: mac_addr, _ID_: multicast_id (include scope)
+ *   NN: net_id, MM: mac_addr, M_ID: multicast_id (include scope)
  */
 
 #ifndef __CDNET_H__
@@ -39,6 +38,13 @@
 
 #ifndef CDNET_DEF_PORT
 #define CDNET_DEF_PORT  0xcdcd
+#endif
+
+#ifndef L0_SHARE_MASK
+#define L0_SHARE_MASK   0xe0
+#endif
+#ifndef L0_SHARE_LEFT
+#define L0_SHARE_LEFT   0x80
 #endif
 
 typedef enum {
@@ -144,11 +150,11 @@ int cdnet_l1_from_frame(const uint8_t *frame, uint8_t local_net,
         uint8_t *seq_val);
 
 int cdnet_l2_to_frame(const cd_addr_t *s_addr, const cd_addr_t *d_addr,
-        const uint8_t *dat, uint32_t len,
+        const uint8_t *dat, uint32_t len, uint8_t user_flag,
         uint8_t max_size, uint8_t seq_val, uint32_t pos, uint8_t *frame);
 
 int cdnet_l2_from_frame(const uint8_t *frame, uint8_t local_net,
         cd_addr_t *s_addr, cd_addr_t *d_addr, uint8_t *dat, uint8_t *len,
-        uint8_t *seq_val, cdnet_frag_t *frag);
+        uint8_t *user_flag, uint8_t *seq_val, cdnet_frag_t *frag);
 
 #endif

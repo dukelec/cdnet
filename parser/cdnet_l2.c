@@ -14,12 +14,12 @@
  * return body size on success
  */
 int cdnet_l2_to_frame(const cd_addr_t *s_addr, const cd_addr_t *d_addr,
-        const uint8_t *dat, uint32_t len,
+        const uint8_t *dat, uint32_t len, uint8_t user_flag,
         uint8_t max_size, uint8_t seq_val, uint32_t pos, uint8_t *frame)
 {
     uint8_t *buf = frame;
     uint8_t *hdr = buf + 3;
-    uint8_t user_flag = d_addr->cd_addr_type & 7;
+    assert((user_flag & ~7) == 0);
     bool seq = !!(d_addr->cd_addr_type & 8);
     uint8_t payload_max = seq ? max_size - 1 : max_size;
     cdnet_frag_t frag;
@@ -55,16 +55,16 @@ int cdnet_l2_to_frame(const cd_addr_t *s_addr, const cd_addr_t *d_addr,
 
 int cdnet_l2_from_frame(const uint8_t *frame, uint8_t local_net,
         cd_addr_t *s_addr, cd_addr_t *d_addr, uint8_t *dat, uint8_t *len,
-        uint8_t *seq_val, cdnet_frag_t *frag)
+        uint8_t *user_flag, uint8_t *seq_val, cdnet_frag_t *frag)
 {
     const uint8_t *buf = frame;
     const uint8_t *hdr = frame + 3;
 
     assert((*hdr & 0xc0) == 0xc0);
     bool seq = !!(*hdr & HDR_L1_L2_SEQ);
-    uint8_t user_flag = *hdr & 7; // hdr
+    *user_flag = *hdr & 7; // hdr
 
-    s_addr->cd_addr_type = (seq ? 0xc8 : 0xc0) | user_flag;
+    s_addr->cd_addr_type = seq ? 0xc8 : 0xc0;
     d_addr->cd_addr_type = s_addr->cd_addr_type;
     s_addr->cd_addr_net = local_net;
     d_addr->cd_addr_net = local_net;
