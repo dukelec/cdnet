@@ -30,6 +30,7 @@ uint8_t cdctl_read_reg(cdctl_dev_t *dev, uint8_t reg)
     }
     return dat;
 }
+
 void cdctl_write_reg(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 {
     dev->manual_ctrl = true;
@@ -158,7 +159,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
 
-    cdctl_write_reg(dev, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
+    cdctl_write_reg(dev, REG_SETTING,
+            cdctl_read_reg(dev, REG_SETTING) | BIT_SETTING_TX_PUSH_PULL);
     cdctl_write_reg(dev, REG_FILTER, filter);
     cdctl_set_baud_rate(dev, baud_l, baud_h);
     cdctl_flush(dev);
@@ -166,7 +168,6 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
     dn_debug(dev->name, "flags: %02x\n", cdctl_read_reg(dev, REG_INT_FLAG));
     cdctl_write_reg(dev, REG_INT_MASK, CDCTL_MASK);
     dev->state = CDCTL_IDLE;
-    // enable int_n interrupt at outside
 }
 
 
@@ -253,7 +254,8 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
                 dev->tx_wait_trigger = false;
 
                 dev->state = CDCTL_TX_CTRL;
-                cdctl_write_reg_it(dev, REG_TX_CTRL, BIT_TX_START);
+                cdctl_write_reg_it(dev, REG_TX_CTRL,
+                        BIT_TX_START | BIT_TX_RST_POINTER);
                 return;
             } else if (!dev->tx_buf_clean_mask) {
                 // enable tx_buf_clean irq
@@ -304,7 +306,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             spi_dma_read(dev->spi, dev->rx_frame->dat + 3,
                     dev->rx_frame->dat[2]);
             return;
-        } // else goto next if block directly
+        } // no return
     }
 
     // end of CDCTL_RX_BODY
@@ -319,7 +321,8 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             dev->rx_no_free_node_cnt++;
         }
         dev->state = CDCTL_RX_CTRL;
-        cdctl_write_reg_it(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING);
+        cdctl_write_reg_it(dev, REG_RX_CTRL,
+                BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
         return;
     }
 
@@ -330,7 +333,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         if (frame->dat[2] != 0) {
             spi_dma_write(dev->spi, frame->dat + 3, frame->dat[2]);
             return;
-        } // else goto next if block directly
+        } // no return
     }
 
     // end of CDCTL_TX_BODY

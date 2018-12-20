@@ -11,7 +11,11 @@
 #define __CDCTL_H__
 
 #include "cdbus.h"
+#ifdef CDCTL_V0X
+#include "cdctl_regs_v0x.h"
+#else // >= v10
 #include "cdctl_regs.h"
+#endif
 
 typedef struct {
     cd_dev_t    cd_dev;
@@ -54,7 +58,7 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 
 static inline void cdctl_flush(cdctl_dev_t *dev)
 {
-    cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_RST);
+    cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_RST_ALL);
 }
 
 void cdctl_routine(cdctl_dev_t *dev);

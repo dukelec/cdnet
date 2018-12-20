@@ -151,7 +151,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
 
-    cdctl_write_reg(dev, REG_SETTING, BIT_SETTING_TX_PUSH_PULL);
+    cdctl_write_reg(dev, REG_SETTING,
+            cdctl_read_reg(dev, REG_SETTING) | BIT_SETTING_TX_PUSH_PULL);
     cdctl_write_reg(dev, REG_FILTER, filter);
     cdctl_set_baud_rate(dev, baud_l, baud_h);
     cdctl_flush(dev);
@@ -188,7 +189,8 @@ void cdctl_routine(cdctl_dev_t *dev)
         cd_frame_t *frame = list_get_entry(dev->free_head, cd_frame_t);
         if (frame) {
             cdctl_read_frame(dev, frame);
-            cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING);
+            cdctl_write_reg(dev, REG_RX_CTRL,
+                    BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
 #ifdef VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
@@ -206,7 +208,8 @@ void cdctl_routine(cdctl_dev_t *dev)
 
         flags = cdctl_read_reg(dev, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN)
-            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START);
+            cdctl_write_reg(dev, REG_TX_CTRL,
+                    BIT_TX_START | BIT_TX_RST_POINTER);
         else
             dev->is_pending = true;
 #ifdef VERBOSE
@@ -222,7 +225,8 @@ void cdctl_routine(cdctl_dev_t *dev)
         flags = cdctl_read_reg(dev, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
             dn_verbose(dev->name, "trigger pending tx\n");
-            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START);
+            cdctl_write_reg(dev, REG_TX_CTRL,
+                    BIT_TX_START | BIT_TX_RST_POINTER);
             dev->is_pending = false;
         }
     }
