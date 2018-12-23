@@ -10,9 +10,6 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
-#include "stm32f1xx_hal.h"
-
-
 #define local_irq_save(flags)       \
     do {                            \
         flags = _local_irq_save();  \

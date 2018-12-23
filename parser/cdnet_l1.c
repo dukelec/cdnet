@@ -36,7 +36,7 @@ static int cal_port_val(uint16_t src, uint16_t dst,
     else
         *src_size = 2;
 
-    if (dst == CDNET_DEF_PORT)
+    if (dst == CDNET_DEF_PORT && src != CDNET_DEF_PORT)
         *dst_size = 0;
     else if (dst <= 0xff)
         *dst_size = 1;
