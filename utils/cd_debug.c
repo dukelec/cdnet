@@ -11,27 +11,21 @@
 
 #include "cd_utils.h"
 #include "cd_list.h"
+#include "cdnet_dispatch.h"
 
 extern uart_t debug_uart;
 
 #ifndef DBG_STR_LEN
-    #define DBG_STR_LEN 80
+    #define DBG_STR_LEN 200
 #endif
-#ifndef DBG_LEN
-    #define DBG_LEN     60
+#ifndef DBG_MIN_PKT
+    #define DBG_MIN_PKT 4
 #endif
 
-typedef struct {
-    list_node_t node;
-    uint8_t data[DBG_STR_LEN];
-    int len;
-} dbg_node_t;
+static bool *dbg_en = NULL;
+static cd_sockaddr_t *dbg_dst = NULL;
+static cdnet_socket_t sock_dbg = { .port = 9 };
 
-
-static dbg_node_t dbg_alloc[DBG_LEN];
-
-static list_head_t dbg_free = {0};
-static list_head_t dbg_tx = {0};
 static int dbg_lost_cnt = 0;
 
 
@@ -39,34 +33,50 @@ static int dbg_lost_cnt = 0;
 
 void _dprintf(char* format, ...)
 {
-    dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
-    if (buf) {
-        va_list arg;
-        va_start (arg, format);
-        // WARN: stack may not enough for reentrant
-        buf->len = vsnprintf((char *)buf->data, DBG_STR_LEN, format, arg);
-        va_end (arg);
-        list_put_it(&dbg_tx, &buf->node);
-    } else {
+    if (!*dbg_en)
+        return;
+
+    if (cdnet_free_pkts.len < DBG_MIN_PKT) {
         uint32_t flags;
         local_irq_save(flags);
         dbg_lost_cnt++;
         local_irq_restore(flags);
+        return;
+    }
+
+    cdnet_packet_t *pkt = cdnet_packet_get(&cdnet_free_pkts);
+    if (pkt) {
+        va_list arg;
+        va_start (arg, format);
+        // WARN: stack may not enough for reentrant
+        pkt->dat[0] = 0;
+        pkt->len = vsnprintf((char *)pkt->dat + 1, DBG_STR_LEN, format, arg) + 1;
+        va_end (arg);
+        pkt->dst = *dbg_dst;
+        cdnet_socket_sendto(&sock_dbg, pkt);
     }
 }
 
 void _dputs(char *str)
 {
-    dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
-    if (buf) {
-        buf->len = strlen(str);
-        memcpy(buf->data, str, buf->len);
-        list_put_it(&dbg_tx, &buf->node);
-    } else {
+    if (!*dbg_en)
+        return;
+
+    if (cdnet_free_pkts.len < DBG_MIN_PKT) {
         uint32_t flags;
         local_irq_save(flags);
         dbg_lost_cnt++;
         local_irq_restore(flags);
+        return;
+    }
+
+    cdnet_packet_t *pkt = cdnet_packet_get(&cdnet_free_pkts);
+    if (pkt) {
+        pkt->dat[0] = 0;
+        pkt->len = strlen(str) + 1;
+        memcpy(pkt->dat + 1, str, pkt->len - 1);
+        pkt->dst = *dbg_dst;
+        cdnet_socket_sendto(&sock_dbg, pkt);
     }
 }
 
@@ -82,43 +92,20 @@ void dhtoa(uint32_t val, char *buf)
     buf[8] = '\0';
 }
 
-void debug_init(void)
+void debug_init(bool *en, cd_sockaddr_t *dst)
 {
-    int i;
-    for (i = 0; i < DBG_LEN; i++)
-        list_put(&dbg_free, &dbg_alloc[i].node);
+    dbg_en = en;
+    dbg_dst = dst;
+    cdnet_socket_bind(&sock_dbg, NULL);
 }
 
 void debug_flush(void)
 {
     static int dbg_lost_last = 0;
 
-    while (true) {
-#ifdef DBG_TX_IT
-        static dbg_node_t *cur_buf = NULL;
-        if (!dbg_transmit_is_ready(&debug_uart))
-            return;
-        if (cur_buf) {
-            list_put_it(&dbg_free, &cur_buf->node);
-            cur_buf = NULL;
-        }
-#endif
-
-        dbg_node_t *buf = list_get_entry_it(&dbg_tx, dbg_node_t);
-        if (!buf) {
-            if (dbg_lost_last != dbg_lost_cnt) {
-                _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
-                dbg_lost_last = dbg_lost_cnt;
-            }
-            return;
-        }
-#ifdef DBG_TX_IT
-        dbg_transmit_it(&debug_uart, buf->data, buf->len);
-        cur_buf = buf;
-#else
-        dbg_transmit(&debug_uart, buf->data, buf->len);
-        list_put_it(&dbg_free, &buf->node);
-#endif
+    if (dbg_lost_last != dbg_lost_cnt && cdnet_free_pkts.len >= DBG_MIN_PKT) {
+        _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
+        dbg_lost_last = dbg_lost_cnt;
     }
 }
 
@@ -133,4 +120,3 @@ int _write(int file, char *data, int len)
    dbg_transmit(&debug_uart, (uint8_t *)data, len);
    return len;
 }
-

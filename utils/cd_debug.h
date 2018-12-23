@@ -67,7 +67,8 @@
 void _dprintf(char *format, ...);
 void _dputs(char *str);
 void dhtoa(uint32_t val, char *buf);
-void debug_init(void);
+//void debug_init(void);
+//void debug_init(bool *en, cd_sockaddr_t *dst);
 void debug_flush(void);
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);

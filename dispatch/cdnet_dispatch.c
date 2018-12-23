@@ -174,6 +174,10 @@ int cdnet_socket_sendto(cdnet_socket_t *sock, cdnet_packet_t *pkt)
 {
     int ret;
     cdnet_intf_t *intf = cdnet_intfs[0];
+    if (!intf) {
+        cdnet_list_put(&cdnet_free_pkts, &pkt->node);
+        return -1;
+    }
     pkt->src.addr.cd_addr = pkt->dst.addr.cd_addr;
     pkt->src.addr.cd_addr_mac = intf->mac;
     pkt->src.port = sock->port;
