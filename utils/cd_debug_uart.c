@@ -15,7 +15,7 @@
 extern uart_t debug_uart;
 
 #ifndef DBG_STR_LEN
-    #define DBG_STR_LEN 80
+    #define DBG_STR_LEN 80 // without '\0'
 #endif
 #ifndef DBG_LEN
     #define DBG_LEN     60
@@ -35,24 +35,43 @@ static list_head_t dbg_tx = {0};
 static int dbg_lost_cnt = 0;
 
 
-// for dprintf
+// for d_printf
 
 void _dprintf(char* format, ...)
 {
-    dbg_node_t *buf = list_get_entry_it(&dbg_free, dbg_node_t);
-    if (buf) {
-        va_list arg;
-        va_start (arg, format);
-        // WARN: stack may not enough for reentrant
-        buf->len = vsnprintf((char *)buf->data, DBG_STR_LEN, format, arg);
-        va_end (arg);
-        list_put_it(&dbg_tx, &buf->node);
+    static dbg_node_t *buf_cont = NULL;
+    dbg_node_t *buf;
+    uint32_t flags;
+    va_list arg;
+
+    local_irq_save(flags);
+    if (buf_cont) {
+        buf = buf_cont;
+        buf_cont = NULL;
     } else {
-        uint32_t flags;
-        local_irq_save(flags);
-        dbg_lost_cnt++;
-        local_irq_restore(flags);
+        buf = list_get_entry(&dbg_free, dbg_node_t);
+        if (!buf) {
+            dbg_lost_cnt++;
+            local_irq_restore(flags);
+            return;
+        }
+        buf->len = 0;
     }
+    local_irq_restore(flags);
+
+    va_start (arg, format);
+    // WARN: stack may not enough for reentrant
+    // NOTE: size include '\0', return value not include '\0'
+    buf->len += min(DBG_STR_LEN + buf->len,
+            vsnprintf((char *)buf->data, DBG_STR_LEN + 1 - buf->len, format, arg));
+    va_end (arg);
+
+    local_irq_save(flags);
+    if (buf->data[buf->len - 1] == '\n' || buf->len == DBG_STR_LEN || buf_cont)
+        list_put(&dbg_tx, &buf->node);
+    else
+        buf_cont = buf;
+    local_irq_restore(flags);
 }
 
 void _dputs(char *str)

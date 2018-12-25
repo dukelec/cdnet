@@ -42,7 +42,7 @@ void hex_dump(const void *addr, int len)
         if ((i % 16) == 0) {
             if (i != 0) {
                 pos += sprintf(pbuf + pos, "  %s\n", sbuf);
-                dputs(pbuf);
+                d_puts(pbuf);
                 pos = 0;
             }
             pos += sprintf(pbuf + pos, "  %04x ", i); // offset
@@ -64,5 +64,5 @@ void hex_dump(const void *addr, int len)
     }
     // print the final ascii field
     pos += sprintf(pbuf + pos, "  %s\n", sbuf);
-    dputs(pbuf);
+    d_puts(pbuf);
 }

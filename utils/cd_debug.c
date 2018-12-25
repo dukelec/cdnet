@@ -16,7 +16,7 @@
 extern uart_t debug_uart;
 
 #ifndef DBG_STR_LEN
-    #define DBG_STR_LEN 200
+    #define DBG_STR_LEN 200 // without '\0'
 #endif
 #ifndef DBG_MIN_PKT
     #define DBG_MIN_PKT 4
@@ -29,31 +29,56 @@ static cdnet_socket_t sock_dbg = { .port = 9 };
 static int dbg_lost_cnt = 0;
 
 
-// for dprintf
+// for d_printf
 
 void _dprintf(char* format, ...)
 {
+    static cdnet_packet_t *pkt_cont = NULL;
+    cdnet_packet_t *pkt;
+    uint32_t flags;
+    va_list arg;
+
     if (!*dbg_en)
         return;
 
+    local_irq_save(flags);
+
     if (cdnet_free_pkts.len < DBG_MIN_PKT) {
-        uint32_t flags;
-        local_irq_save(flags);
         dbg_lost_cnt++;
         local_irq_restore(flags);
         return;
     }
 
-    cdnet_packet_t *pkt = cdnet_packet_get(&cdnet_free_pkts);
-    if (pkt) {
-        va_list arg;
-        va_start (arg, format);
-        // WARN: stack may not enough for reentrant
-        pkt->dat[0] = 0;
-        pkt->len = vsnprintf((char *)pkt->dat + 1, DBG_STR_LEN, format, arg) + 1;
-        va_end (arg);
-        pkt->dst = *dbg_dst;
+    if (pkt_cont) {
+        pkt = pkt_cont;
+        pkt_cont = NULL;
+        local_irq_restore(flags);
+    } else {
+        local_irq_restore(flags);
+        pkt = cdnet_packet_get(&cdnet_free_pkts);
+        if (pkt) {
+            pkt->dat[0] = 0;
+            pkt->len = 1;
+            pkt->dst = *dbg_dst;
+        } else {
+            return;
+        }
+    }
+
+    va_start (arg, format);
+    // WARN: stack may not enough for reentrant
+    // NOTE: size include '\0', return value not include '\0'
+    pkt->len += min(DBG_STR_LEN + 1 - pkt->len, // + 1 for dat[0]
+            vsnprintf((char *)pkt->dat + pkt->len, DBG_STR_LEN + 2 - pkt->len, format, arg));
+    va_end (arg);
+
+    local_irq_save(flags);
+    if (pkt->dat[pkt->len - 1] == '\n' || pkt->len == DBG_STR_LEN + 1 || pkt_cont) {
+        local_irq_restore(flags);
         cdnet_socket_sendto(&sock_dbg, pkt);
+    } else {
+        pkt_cont = pkt;
+        local_irq_restore(flags);
     }
 }
 
