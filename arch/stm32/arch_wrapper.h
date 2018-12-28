@@ -18,7 +18,7 @@
 static inline uint32_t _local_irq_save(void)
 {
     uint32_t flags;
-    asm volatile(
+    __asm__ volatile(
         "    mrs %0, primask\n"
         "    cpsid i"
         : "=r" (flags) : : "memory", "cc");
@@ -27,19 +27,19 @@ static inline uint32_t _local_irq_save(void)
 
 static inline void local_irq_restore(uint32_t flags)
 {
-    asm volatile(
+    __asm__ volatile(
         "    msr primask, %0"
         : : "r" (flags) : "memory", "cc");
 }
 
 static inline void local_irq_enable(void)
 {
-    asm volatile("    cpsie i" : : : "memory", "cc");
+    __asm__ volatile("    cpsie i" : : : "memory", "cc");
 }
 
 static inline void local_irq_disable(void)
 {
-    asm volatile("    cpsid i" : : : "memory", "cc");
+    __asm__ volatile("    cpsid i" : : : "memory", "cc");
 }
 
 

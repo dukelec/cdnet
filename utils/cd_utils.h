@@ -10,10 +10,6 @@
 #ifndef __CD_UTILS_H__
 #define __CD_UTILS_H__
 
-#if __has_include("cd_config.h")
-#include "cd_config.h"
-#endif
-
 #include <errno.h>
 #include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
 #include <string.h>
@@ -24,6 +20,8 @@
 #include <stddef.h>     // provide offsetof, NULL
 #include <stdint.h>
 
+#include "cd_config.h"
+
 //#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 //#define NULL 0
 
@@ -31,6 +29,8 @@
 #define container_of(ptr, type, member) \
     ((type *)((char *)(ptr) - offsetof(type, member)))
 #endif
+
+#if !__STRICT_ANSI__ && __GNUC__ >= 3
 
 #ifndef sign
 #define sign(a) ({                  \
@@ -77,5 +77,24 @@
                 (((__x) + ((__d) / 2)) / (__d)) :                           \
                 (((__x) - ((__d) / 2)) / (__d));                            \
     })
+
+#else
+
+// simple version without GCC's statement expression ({...})
+#ifndef sign
+#define sign(a) (((a) < 0) ? -1 : ((a) > 0))
+#endif
+#ifndef max
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#endif
+#ifndef min
+#define min(a, b) ((a) < (b) ? (a) : (b))
+#endif
+#ifndef clip
+#define clip(a, b, c) ((a) < (b) ? (b) : ((a) > (c) ? (c) : (a)))
+#endif
+#define DIV_ROUND_CLOSEST(x, divisor) (((x) + ((divisor) / 2)) / (divisor))
+
+#endif
 
 #endif

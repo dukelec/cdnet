@@ -62,8 +62,8 @@ void _dprintf(char* format, ...)
     va_start (arg, format);
     // WARN: stack may not enough for reentrant
     // NOTE: size include '\0', return value not include '\0'
-    buf->len += min(DBG_STR_LEN + buf->len,
-            vsnprintf((char *)buf->data, DBG_STR_LEN + 1 - buf->len, format, arg));
+    int tgt_len = vsnprintf((char *)buf->data, DBG_STR_LEN + 1 - buf->len, format, arg);
+    buf->len += min(DBG_STR_LEN + buf->len, tgt_len);
     va_end (arg);
 
     local_irq_save(flags);
