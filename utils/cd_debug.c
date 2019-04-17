@@ -57,7 +57,7 @@ void _dprintf(char* format, ...)
         local_irq_restore(flags);
         pkt = cdnet_packet_get(&cdnet_free_pkts);
         if (pkt) {
-            pkt->dat[0] = 0;
+            pkt->dat[0] = 0x40;
             pkt->len = 1;
             pkt->dst = *dbg_dst;
         } else {
@@ -98,7 +98,7 @@ void _dputs(char *str)
 
     cdnet_packet_t *pkt = cdnet_packet_get(&cdnet_free_pkts);
     if (pkt) {
-        pkt->dat[0] = 0;
+        pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);
         pkt->dst = *dbg_dst;
