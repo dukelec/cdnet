@@ -38,7 +38,7 @@ void _dprintf(char* format, ...)
     uint32_t flags;
     va_list arg;
 
-    if (!*dbg_en)
+    if (!dbg_en || !*dbg_en)
         return;
 
     local_irq_save(flags);
@@ -59,7 +59,7 @@ void _dprintf(char* format, ...)
         if (pkt) {
             pkt->dat[0] = 0x40;
             pkt->len = 1;
-            pkt->dst = *dbg_dst;
+            memcpy(&pkt->dst, dbg_dst, sizeof(cd_sockaddr_t));
         } else {
             return;
         }
@@ -85,7 +85,7 @@ void _dprintf(char* format, ...)
 
 void _dputs(char *str)
 {
-    if (!*dbg_en)
+    if (!dbg_en || !*dbg_en)
         return;
 
     if (cdnet_free_pkts.len < DBG_MIN_PKT) {
@@ -101,7 +101,7 @@ void _dputs(char *str)
         pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);
-        pkt->dst = *dbg_dst;
+        memcpy(&pkt->dst, dbg_dst, sizeof(cd_sockaddr_t));
         cdnet_socket_sendto(&sock_dbg, pkt);
     }
 }
