@@ -218,6 +218,10 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             ret |= BIT_RX_CLR_ERROR;
             dev->rx_error_cnt++;
         }
+        if (val & BIT_FLAG_RX_BREAK) {
+            ret |= BIT_RX_CLR_BREAK;
+            dev->rx_break_cnt++;
+        }
         if (ret) {
             dev->state = CDCTL_RX_CTRL;
             cdctl_write_reg_it(dev, REG_RX_CTRL, ret);
