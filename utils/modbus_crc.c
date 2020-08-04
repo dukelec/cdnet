@@ -45,7 +45,7 @@ const uint16_t crc16_table[] = {
     0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
 
-uint16_t crc16(const uint8_t *data, uint16_t length)
+uint16_t crc16(const uint8_t *data, uint32_t length)
 {
    uint16_t crc_val = 0xFFFF;
 

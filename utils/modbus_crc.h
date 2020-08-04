@@ -22,8 +22,7 @@ static inline void crc16_byte(uint8_t data, uint16_t *crc_val)
     *crc_val >>= 8;
     *crc_val ^= crc16_table[tmp];
 }
-
-uint16_t crc16(const uint8_t *data, uint16_t length);
+uint16_t crc16(const uint8_t *data, uint32_t length);
 
 #endif
 

@@ -20,7 +20,13 @@
 #include <stddef.h>     // provide offsetof, NULL
 #include <stdint.h>
 
+#ifdef __has_include
+#if __has_include("cd_config.h")
 #include "cd_config.h"
+#endif
+#else
+#include "cd_config.h"
+#endif
 
 //#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)
 //#define NULL 0
@@ -77,6 +83,10 @@
                 (((__x) + ((__d) / 2)) / (__d)) :                           \
                 (((__x) - ((__d) / 2)) / (__d));                            \
     })
+
+#ifndef __weak
+#define __weak  __attribute__((weak))
+#endif
 
 #else
 

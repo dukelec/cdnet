@@ -15,12 +15,12 @@ int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
 {
     uint8_t *buf = frame;
 
-    assert(dst->addr.cd_addr_type == 0x00);
+    assert(dst->addr[0] == 0x00);
     assert((src->port == CDNET_DEF_PORT && dst->port <= 63) ||
             dst->port == CDNET_DEF_PORT);
 
-    *buf++ = src->addr.cd_addr_mac;
-    *buf++ = dst->addr.cd_addr_mac;
+    *buf++ = src->addr[2];
+    *buf++ = dst->addr[2];
     buf++; // fill at end
 
     if (src->port == CDNET_DEF_PORT) { // out request
@@ -52,13 +52,13 @@ int cdnet_l0_from_frame(const uint8_t *frame,
 
     assert(!(*hdr & 0x80));
 
-    src->addr.cd_addr_type = 0;
-    src->addr.cd_addr_net = local_net;
-    dst->addr.cd_addr_type = 0;
-    dst->addr.cd_addr_net = local_net;
+    src->addr[0] = 0;
+    src->addr[1] = local_net;
+    dst->addr[0] = 0;
+    dst->addr[1] = local_net;
 
-    src->addr.cd_addr_mac = *buf++;
-    dst->addr.cd_addr_mac = *buf++;
+    src->addr[2] = *buf++;
+    dst->addr[2] = *buf++;
     *len = (*buf++) - 1;
     assert(*len >= 1);
     buf++; // skip hdr

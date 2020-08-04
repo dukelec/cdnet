@@ -9,15 +9,15 @@
 
 /* CDNET address string format:
  *
- *              local link     unique local    local and cross net multicast
+ *              local link     unique local    multicast
  * level0:       00:NN:MM
- * level1:       80:NN:MM        a0:NN:MM     90:M_ID     b0:M_ID
- *  `-with seq:  88:NN:MM        a8:NN:MM     98:M_ID     b8:M_ID
+ * level1:       80:NN:MM        a0:NN:MM       ff:MH:ML
+ *  `-with seq:  88:NN:MM        a8:NN:MM       ff:MH:ML
  * level2:       c0:NN:MM
  *  `-with seq:  c8:NN:MM
- *
+ *                   `- ff: use default interface
  * Notes:
- *   NN: net_id, MM: mac_addr, M_ID: multicast_id (include scope)
+ *   NN: net_id, MM: mac_addr, MH+ML: multicast_id
  */
 
 #ifndef __CDNET_H__
@@ -77,61 +77,9 @@ typedef enum {
 
 
 typedef struct {
-    union {
-        uint32_t    addr;
-        uint8_t     addr8[3];
-        struct {
-            uint8_t type;
-            uint8_t net;
-            uint8_t mac;
-        } cd_field_s;
-        struct {
-            uint8_t type;
-            uint16_t m_id;
-        } cd_mcast_s;
-    } cd_addr_u;
-#define cd_addr         cd_addr_u.addr
-#define cd_addr8        cd_addr_u.addr8
-#define cd_addr_type    cd_addr_u.cd_field_s.type
-#define cd_addr_net     cd_addr_u.cd_field_s.net
-#define cd_addr_mac     cd_addr_u.cd_field_s.mac
-#define cd_addr_m_id    cd_addr_u.cd_mcast_s.m_id
-} cd_addr_t;
-
-typedef struct {
-    cd_addr_t addr;
+    uint8_t  addr[3]; // [type, net, mac] or [type, mh, ml]
     uint16_t port;
 } cd_sockaddr_t;
-
-
-static inline void cdnet_set_addr(cd_addr_t *addr,
-        uint8_t type, uint8_t net, uint8_t mac)
-{
-    addr->cd_addr_type = type;
-    addr->cd_addr_net = net;
-    addr->cd_addr_mac = mac;
-}
-
-static inline void cdnet_set_addr_mcast(cd_addr_t *addr,
-        uint8_t type, uint16_t m_id)
-{
-    addr->cd_addr_type = type;
-    addr->cd_addr_m_id = m_id;
-}
-
-static inline void cdnet_set_sockaddr(cd_sockaddr_t *addr,
-        uint8_t type, uint8_t net, uint8_t mac, uint16_t port)
-{
-    cdnet_set_addr(&addr->addr, type, net, mac);
-    addr->port = port;
-}
-
-static inline void cdnet_set_sockaddr_mcast(cd_sockaddr_t *addr,
-        uint8_t type, uint16_t m_id, uint16_t port)
-{
-    cdnet_set_addr_mcast(&addr->addr, type, m_id);
-    addr->port = port;
-}
 
 
 int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
@@ -149,12 +97,12 @@ int cdnet_l1_from_frame(const uint8_t *frame, uint8_t local_net,
         cd_sockaddr_t *src, cd_sockaddr_t *dst, uint8_t *dat, uint8_t *len,
         uint8_t *seq_val);
 
-int cdnet_l2_to_frame(const cd_addr_t *s_addr, const cd_addr_t *d_addr,
+int cdnet_l2_to_frame(const uint8_t *s_addr, const uint8_t *d_addr,
         const uint8_t *dat, uint32_t len, uint8_t user_flag,
         uint8_t max_size, uint8_t seq_val, uint32_t pos, uint8_t *frame);
 
 int cdnet_l2_from_frame(const uint8_t *frame, uint8_t local_net,
-        cd_addr_t *s_addr, cd_addr_t *d_addr, uint8_t *dat, uint8_t *len,
+        uint8_t *s_addr, uint8_t *d_addr, uint8_t *dat, uint8_t *len,
         uint8_t *user_flag, uint8_t *seq_val, cdnet_frag_t *frag);
 
 #endif

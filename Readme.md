@@ -10,6 +10,10 @@ CDNET is a high layer protocol for CDBUS
 7. [More Resources](#more-resources)
 
 
+CDBUS frame:  
+[src, dst, len] + [CDNET payload] + [crc_l, crc_h]
+
+
 ## CDNET Levels
 
 CDNET protocol has three different levels, select by bit7 and bit6 of first byte:
@@ -98,12 +102,13 @@ First byte:
 | MULTI_NET | MULTICAST | DESCRIPTION                                                               |
 |-----------|-----------|---------------------------------------------------------------------------|
 | 0         | 0         | Local net: append 0 byte                                                  |
-| 0         | 1         | Local net multicast: append 2 bytes `[multicast-id]`                      |
+| 0         | 1         | Local net multicast: append 2 bytes `[mh, ml]`                            |
 | 1         | 0         | Cross net: append 4 bytes: `[src_net, src_mac, dst_net, dst_mac]`         |
-| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, multicast-id]`   |
+| 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, mh, ml]`         |
 
 Notes:
- - Broadcast could simply not use the MULTICAST bit.
+ - mh + ml: multicast_id, ml is mapped to mac layer multicast address;
+ - Could simply use MULTI_NET = 0 and MULTICAST = 0 for local net multicast and broadcast.
 
 ### SEQUENCE
 0: No sequence number;  

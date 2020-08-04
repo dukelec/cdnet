@@ -67,10 +67,9 @@ int cdnet_l1_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
 
     uint8_t *buf = frame;
     uint8_t *hdr = frame + 3;
-    cdnet_multi_t multi = (dst->addr.cd_addr_type >> 4) & 3;
+    cdnet_multi_t multi = (dst->addr[0] >> 4) & 3;
 
-    assert((dst->addr.cd_addr_type & 0xc0) == 0x80 ||
-           (dst->addr.cd_addr_type & 7) == 0);
+    assert((dst->addr[0] & 0xc0) == 0x80 || (dst->addr[0] & 7) == 0);
 
     *buf++ = src_mac;
     buf += 3; // skip hdr
@@ -79,35 +78,35 @@ int cdnet_l1_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
     switch (multi) {
     case CDNET_MULTI_CAST:
         // multicast_id
-        *buf++ = dst->addr.cd_addr8[1];
-        *buf++ = dst->addr.cd_addr8[2];
-        assert(frame[0] == src->addr.cd_addr_mac)
-        frame[1] = dst->addr.cd_addr8[1];
+        *buf++ = dst->addr[1];
+        *buf++ = dst->addr[2];
+        assert(frame[0] == src->addr[2])
+        frame[1] = dst->addr[2];
         break;
     case CDNET_MULTI_NET:
-        *buf++ = src->addr.cd_addr_net;
-        *buf++ = src->addr.cd_addr_mac;
-        *buf++ = dst->addr.cd_addr_net;
-        *buf++ = dst->addr.cd_addr_mac;
+        *buf++ = src->addr[1];
+        *buf++ = src->addr[2];
+        *buf++ = dst->addr[1];
+        *buf++ = dst->addr[2];
         //frame[1] = cdnet_get_router(&dst->addr);
         assert(false); // not support multi-net currently
         break;
     case CDNET_MULTI_CAST_NET:
-        *buf++ = src->addr.cd_addr_net;
-        *buf++ = src->addr.cd_addr_mac;
+        *buf++ = src->addr[1];
+        *buf++ = src->addr[2];
         // multicast_id
-        *buf++ = dst->addr.cd_addr8[1];
-        *buf++ = dst->addr.cd_addr8[2];
+        *buf++ = dst->addr[1];
+        *buf++ = dst->addr[2];
         // TODO: set to 255 if remote hw filter not enough
-        frame[1] = dst->addr.cd_addr8[1];
+        frame[1] = dst->addr[2];
         break;
     default:
-        assert(frame[0] == src->addr.cd_addr_mac)
-        frame[1] = dst->addr.cd_addr_mac;
+        assert(frame[0] == src->addr[2])
+        frame[1] = dst->addr[2];
         break;
     }
 
-    if (dst->addr.cd_addr_type & 8) {
+    if (dst->addr[0] & 8) {
         *hdr |= HDR_L1_L2_SEQ;
         *buf++ = seq_val;
     }
@@ -153,36 +152,36 @@ int cdnet_l1_from_frame(const uint8_t *frame, uint8_t local_net,
 
     switch (multi) {
     case CDNET_MULTI_CAST:
-        src->addr.cd_addr_type = seq ? 0x88 : 0x80;
-        src->addr.cd_addr_net = local_net;
-        src->addr.cd_addr_mac = src_mac;
-        dst->addr.cd_addr_type = seq ? 0x98 : 0x90;
-        dst->addr.cd_addr_m_id = *buf++;
-        dst->addr.cd_addr_m_id |= (*buf++) << 8;
+        src->addr[0] = seq ? 0x88 : 0x80;
+        src->addr[1] = local_net;
+        src->addr[2] = src_mac;
+        dst->addr[0] = seq ? 0x98 : 0x90;
+        dst->addr[1] = *buf++;
+        dst->addr[2] = *buf++;
         break;
     case CDNET_MULTI_NET:
-        src->addr.cd_addr_type = seq ? 0xa8 : 0xa0;
-        src->addr.cd_addr_net = *buf++;
-        src->addr.cd_addr_mac = *buf++;
-        dst->addr.cd_addr_type = seq ? 0xa8 : 0xa0;
-        dst->addr.cd_addr_net = *buf++;
-        dst->addr.cd_addr_mac = *buf++;
+        src->addr[0] = seq ? 0xa8 : 0xa0;
+        src->addr[1] = *buf++;
+        src->addr[2] = *buf++;
+        dst->addr[0] = seq ? 0xa8 : 0xa0;
+        dst->addr[1] = *buf++;
+        dst->addr[2] = *buf++;
         break;
     case CDNET_MULTI_CAST_NET:
-        src->addr.cd_addr_type = seq ? 0xa8 : 0xa0;
-        src->addr.cd_addr_net = *buf++;
-        src->addr.cd_addr_mac = *buf++;
-        dst->addr.cd_addr_type = seq ? 0xb8 : 0xb0;
-        dst->addr.cd_addr_m_id = *buf++;
-        dst->addr.cd_addr_m_id |= (*buf++) << 8;
+        src->addr[0] = seq ? 0xa8 : 0xa0;
+        src->addr[1] = *buf++;
+        src->addr[2] = *buf++;
+        dst->addr[0] = seq ? 0xb8 : 0xb0;
+        dst->addr[1] = *buf++;
+        dst->addr[2] = *buf++;
         break;
     default:
-        src->addr.cd_addr_type = seq ? 0x88 : 0x80;
-        src->addr.cd_addr_net = local_net;
-        src->addr.cd_addr_mac = src_mac;
-        dst->addr.cd_addr_type = seq ? 0x88 : 0x80;
-        dst->addr.cd_addr_net = local_net;
-        dst->addr.cd_addr_mac = dst_mac;
+        src->addr[0] = seq ? 0x88 : 0x80;
+        src->addr[1] = local_net;
+        src->addr[2] = src_mac;
+        dst->addr[0] = seq ? 0x88 : 0x80;
+        dst->addr[1] = local_net;
+        dst->addr[2] = dst_mac;
         break;
     }
 
