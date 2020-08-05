@@ -24,8 +24,12 @@
 #if __has_include("cd_config.h")
 #include "cd_config.h"
 #endif
+#if __has_include("arch_wrapper.h")
+#include "arch_wrapper.h"
+#endif
 #else
 #include "cd_config.h"
+#include "arch_wrapper.h"
 #endif
 
 //#define offsetof(TYPE, MEMBER) ((size_t) &((TYPE *)0)->MEMBER)

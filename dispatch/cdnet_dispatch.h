@@ -97,7 +97,7 @@ typedef struct {
 
 int cdnet_intf_register(cdnet_intf_t *intf);
 cdnet_intf_t *cdnet_intf_search(uint8_t net);
-cdnet_intf_t *cdnet_route_search(const cd_addr_t *d_addr, uint8_t *d_mac);
+cdnet_intf_t *cdnet_route_search(const uint8_t *d_addr, uint8_t *d_mac);
 
 void cdnet_intf_init(cdnet_intf_t *intf, cd_dev_t *dev,
         uint8_t net, uint8_t mac);

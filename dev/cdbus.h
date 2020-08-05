@@ -11,9 +11,7 @@
 #define __CDBUS_H__
 
 #include "cd_utils.h"
-#include "arch_wrapper.h"
 #include "cd_list.h"
-
 
 #ifndef CD_FRAME_SIZE
 #define CD_FRAME_SIZE   260 // max size for cdbus through uart

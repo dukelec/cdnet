@@ -23,10 +23,10 @@ cdnet_intf_t *cdnet_intf_search(uint8_t net)
     return cdnet_intfs[0];
 }
 
-cdnet_intf_t *cdnet_route_search(const cd_addr_t *d_addr, uint8_t *d_mac)
+cdnet_intf_t *cdnet_route_search(const uint8_t *d_addr, uint8_t *d_mac)
 {
     if (d_mac)
-        *d_mac = d_addr->cd_addr_mac;
+        *d_mac = d_addr[2];
     return cdnet_intfs[0];
 }
 
@@ -178,8 +178,8 @@ int cdnet_socket_sendto(cdnet_socket_t *sock, cdnet_packet_t *pkt)
         cdnet_list_put(&cdnet_free_pkts, &pkt->node);
         return -1;
     }
-    pkt->src.addr.cd_addr = pkt->dst.addr.cd_addr;
-    pkt->src.addr.cd_addr_mac = intf->mac;
+    memcpy(pkt->src.addr, pkt->dst.addr, 3);
+    pkt->src.addr[2] = intf->mac;
     pkt->src.port = sock->port;
 
     ret = cdnet_intf_sendto(intf, pkt);
