@@ -4,78 +4,92 @@
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: Duke Fong <duke@dukelec.com>
+ * Author: Duke Fong <d@d-l.io>
  */
 
 #include "cdnet.h"
 
 
-int cdnet_l0_to_frame(const cd_sockaddr_t *src, const cd_sockaddr_t *dst,
-        const uint8_t *dat, uint8_t len, bool allow_share, uint8_t *frame)
+int cdn0_to_payload(const cdn_packet_t *pkt, uint8_t *payload)
 {
-    uint8_t *buf = frame;
+    const cdn_sockaddr_t *src = pkt->src;
+    const cdn_sockaddr_t *dst = pkt->dst;
+    const uint8_t *dat = pkt->dat;
+    uint8_t len = pkt->len;
 
-    assert(dst->addr[0] == 0x00);
-    assert((src->port == CDNET_DEF_PORT && dst->port <= 63) ||
-            dst->port == CDNET_DEF_PORT);
+    cd_assert(dst->addr[0] == 0x00);
+    cd_assert((src->port == CDN_DEF_PORT && dst->port <= 63) || dst->port == CDN_DEF_PORT);
 
-    *buf++ = src->addr[2];
-    *buf++ = dst->addr[2];
-    buf++; // fill at end
-
-    if (src->port == CDNET_DEF_PORT) { // out request
-                                    // backup dst port if need at outside
-        *buf++ = dst->port; // hdr
+    if (src->port == CDN_DEF_PORT) { // out request
+#ifndef CDN_L0_C
+        cd_assert(false); // not support
+#endif
+        *payload = dst->port; // hdr
     } else { // out reply
-        if (len >= 1 && (dat[0] & L0_SHARE_MASK) == L0_SHARE_LEFT) {
+        if (len >= 1 && (dat[0] & CDN0_SHARE_MASK) == CDN0_SHARE_LEFT) {
             // share first byte
-            *buf++ = HDR_L0_REPLY | HDR_L0_SHARE | (dat[0] & ~L0_SHARE_MASK);
+            *payload = CDN_HDR_L0_REPLY | CDN_HDR_L0_SHARE | (dat[0] & ~CDN0_SHARE_MASK);
             len--;
             dat++;
         } else {
-            *buf++ = HDR_L0_REPLY; // hdr
+            *payload = CDN_HDR_L0_REPLY; // hdr
         }
     }
 
-    assert(buf - frame + len <= 256);
-    *(frame + 2) = buf - frame + len - 3;
-    memcpy(buf, dat, len);
+    cd_assert(len + 1 <= 253);
+    memcpy(payload + 1, dat, len);
+    return len + 1;
+}
+
+int cdn0_to_frame(cdn_packet_t *pkt, uint8_t *frame)
+{
+    int ret = cdn0_to_payload(pkt, frame + 3);
+    if (ret < 0)
+        return ret;
+    frame[2] = ret;
     return 0;
 }
 
-int cdnet_l0_from_frame(const uint8_t *frame,
-        uint8_t local_net, uint16_t last_port,
-        cd_sockaddr_t *src, cd_sockaddr_t *dst, uint8_t *dat, uint8_t *len)
+
+int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt)
 {
-    const uint8_t *buf = frame;
-    const uint8_t *hdr = frame + 3;
+    cdn_sockaddr_t *src = pkt->src;
+    cdn_sockaddr_t *dst = pkt->dst;
+    uint8_t *dat = pkt->dat;
 
-    assert(!(*hdr & 0x80));
-
+    cd_assert(!(*payload & 0x80));
     src->addr[0] = 0;
-    src->addr[1] = local_net;
+    src->addr[1] = pkt->_l_net;
     dst->addr[0] = 0;
-    dst->addr[1] = local_net;
+    dst->addr[1] = pkt->_l_net;
+    src->addr[2] = pkt->_s_mac;
+    dst->addr[2] = pkt->_d_mac;
+    pkt->len = len - 1;
 
-    src->addr[2] = *buf++;
-    dst->addr[2] = *buf++;
-    *len = (*buf++) - 1;
-    assert(*len >= 1);
-    buf++; // skip hdr
-
-    if (*hdr & HDR_L0_REPLY) { // in reply
-        src->port = last_port;
-        dst->port = CDNET_DEF_PORT;
-        if (*hdr & HDR_L0_SHARE) {
-            (*len)--;
-            *dat++ = (*hdr & 0x1f) | L0_SHARE_LEFT;
+    if (*payload & CDN_HDR_L0_REPLY) { // in reply
+#ifdef CDN_L0_C
+        src->port = pkt->_l0_lp;
+        dst->port = CDN_DEF_PORT;
+        if (*payload & CDN_HDR_L0_SHARE) {
+            pkt->len++;
+            *dat++ = (*payload & 0x1f) | CDN0_SHARE_LEFT;
         }
+#else
+        cd_assert(false); // not support
+#endif
     } else { // in request
-        src->port = CDNET_DEF_PORT;
-        dst->port = *hdr;
+        src->port = CDN_DEF_PORT;
+        dst->port = *payload;
     }
 
-    assert(*len >= 0);
-    memcpy(dat, buf, *len);
+    memcpy(dat, payload + 1, len - 1);
     return 0;
+}
+
+// addition in: _l_net, _l0_lp (central only)
+int cdn0_from_frame(const uint8_t *frame, cdn_packet_t *pkt)
+{
+    pkt->_s_mac = frame[0];
+    pkt->_d_mac = frame[1];
+    return cdn0_from_payload(frame + 3, frame[2], pkt);
 }
