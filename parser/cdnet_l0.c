@@ -10,7 +10,7 @@
 #include "cdnet.h"
 
 
-int cdn0_to_payload(const cdn_packet_t *pkt, uint8_t *payload)
+int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 {
     const cdn_sockaddr_t *src = pkt->src;
     const cdn_sockaddr_t *dst = pkt->dst;
@@ -41,7 +41,7 @@ int cdn0_to_payload(const cdn_packet_t *pkt, uint8_t *payload)
     return len + 1;
 }
 
-int cdn0_to_frame(cdn_packet_t *pkt, uint8_t *frame)
+int cdn0_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
 {
     int ret = cdn0_to_payload(pkt, frame + 3);
     if (ret < 0)
@@ -51,7 +51,7 @@ int cdn0_to_frame(cdn_packet_t *pkt, uint8_t *frame)
 }
 
 
-int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt)
+int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 {
     cdn_sockaddr_t *src = pkt->src;
     cdn_sockaddr_t *dst = pkt->dst;
@@ -87,7 +87,7 @@ int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt)
 }
 
 // addition in: _l_net, _l0_lp (central only)
-int cdn0_from_frame(const uint8_t *frame, cdn_packet_t *pkt)
+int cdn0_from_frame(const uint8_t *frame, cdn_pkt_t *pkt)
 {
     pkt->_s_mac = frame[0];
     pkt->_d_mac = frame[1];

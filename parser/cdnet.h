@@ -122,21 +122,21 @@ typedef struct {
     uint8_t         len;
 #endif
     uint8_t         dat[CDN_MAX_DAT];
-} cdn_packet_t;
+} cdn_pkt_t;
 
 
-int cdn0_to_payload(const cdn_packet_t *pkt, uint8_t *payload);
-int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt);
-int cdn1_to_payload(const cdn_packet_t *pkt, uint8_t *payload);
-int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt);
-int cdn2_to_payload(const cdn_packet_t *pkt, uint8_t *payload);
-int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt);
+int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
+int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
+int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
+int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
+int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
+int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
 
-int cdn0_to_frame(const cdn_packet_t *pkt, uint8_t *frame);
-int cdn0_from_frame(const uint8_t *frame, uint8_t len, cdn_packet_t *pkt);
-int cdn1_to_frame(const cdn_packet_t *pkt, uint8_t *frame);
-int cdn1_from_frame(const uint8_t *frame, uint8_t len, cdn_packet_t *pkt);
-int cdn2_to_frame(const cdn_packet_t *pkt, uint8_t *frame);
-int cdn2_from_frame(const uint8_t *frame, uint8_t len, cdn_packet_t *pkt);
+int cdn0_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
+int cdn0_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
+int cdn1_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
+int cdn2_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
 
 #endif

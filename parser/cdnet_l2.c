@@ -10,7 +10,7 @@
 #include "cdnet.h"
 
 
-int cdn2_to_payload(const cdn_packet_t *pkt, uint8_t *payload)
+int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 {
     const uint8_t *s_addr = &pkt->src.addr;
     uint8_t *buf = payload + 1;
@@ -47,7 +47,7 @@ int cdn2_to_payload(const cdn_packet_t *pkt, uint8_t *payload)
 }
 
 // addition in: _seq, _l2_pos, l2_uf; out: _l2_pos, _l2_frag
-int cdn2_to_frame(const cdn_packet_t *pkt, uint8_t *frame)
+int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->src.addr[2];
     frame[1] = pkt->dst.addr[2];
@@ -59,7 +59,7 @@ int cdn2_to_frame(const cdn_packet_t *pkt, uint8_t *frame)
 }
 
 
-int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt)
+int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 {
     uint8_t *s_addr = &pkt->src.addr;
     uint8_t *d_addr = &pkt->dst.addr;
@@ -92,7 +92,7 @@ int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_packet_t *pkt)
 }
 
 // addition in: _l_net; out: _seq, _l2_frag, l2_uf
-int cdn2_from_frame(const uint8_t *frame, cdn_packet_t *pkt)
+int cdn2_from_frame(const uint8_t *frame, cdn_pkt_t *pkt)
 {
     pkt->_s_mac = frame[0];
     pkt->_d_mac = frame[1];
