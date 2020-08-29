@@ -5,7 +5,7 @@
  * All rights reserved.
  *
  * Author: http://www.modbustools.com/modbus_crc16.htm
- * Modified by: Duke Fong <duke@dukelec.com>
+ * Modified by: Duke Fong <d@d-l.io>
  */
 
 #include "modbus_crc.h"

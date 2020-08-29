@@ -4,7 +4,7 @@
  * Copyright (c) 2017, DUKELEC, Inc.
  * All rights reserved.
  *
- * Author: Duke Fong <duke@dukelec.com>
+ * Author: Duke Fong <d@d-l.io>
  * Reference: https://electronics.stackexchange.com/questions/206113/
  *                          how-do-i-use-the-printf-function-on-stm32
  */

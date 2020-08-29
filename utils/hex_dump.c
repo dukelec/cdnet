@@ -6,7 +6,7 @@
  *
  * Author:
  *   Dominik Liebler
- *   Duke Fong <duke@dukelec.com>
+ *   Duke Fong <d@d-l.io>
  */
 
 #include "cd_utils.h"
