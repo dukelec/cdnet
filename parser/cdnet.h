@@ -89,10 +89,14 @@ typedef struct {
 #endif
 
 #define CDN_CONF_NOT_FREE   (1 << 0) // not free packet after transmit
-#define CDN_CONF_READ_SEQ   (1 << 1) // read targets seq
-#define CDN_CONF_RESET_SEQ  (1 << 2) // reset targets seq to zero
-#define CDN_CONF_KEEP_SEQ   (1 << 3) // seq not increase for retry
-#define CDN_CONF_NO_DAT     (1 << 4) // control seq only
+#define CDN_CONF_REQ_ACK    (1 << 1) // request ack
+
+#define CDN_RET_NO_FREE     1   // no free frame, pkt, or tgt
+#define CDN_RET_FMT_ERR     2
+#define CDN_RET_ROUTE_ERR   3
+#define CDN_RET_TIMEOUT     4
+#define CDN_RET_SEQ_ERR     5
+#define CDN_RET_OTHER_ERR   0x7f
 
 typedef struct {
     list_node_t     node;
@@ -106,7 +110,6 @@ typedef struct {
 #endif
 #ifdef CDN_L2
     uint8_t         l2_uf;  // user flag
-    uint32_t        _l2_pos;
     cdnet_frag_t    _l2_frag;
 #endif
 
@@ -138,5 +141,12 @@ int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
 int cdn1_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
 int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
 int cdn2_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+
+static inline void cdn_set_addr(uint8_t *addr, uint8_t a0, uint8_t a1, uint8_t a2)
+{
+    addr[0] = a0;
+    addr[1] = a1;
+    addr[2] = a2;
+}
 
 #endif

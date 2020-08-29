@@ -101,13 +101,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 int cdn1_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->_s_mac;
-    if ((pkt->src->addr[0] & 0xf0) == 0xa0 && pkt->dst->addr[0] != 0xff) {
-        frame[1] = pkt->_d_mac; // from router
-    } else {
-        // local net and/or multi-cast
-        frame[1] = pkt->dst->addr[2];
-    }
-
+    frame[1] = pkt->_d_mac;
     int ret = cdn1_to_payload(pkt, frame + 3);
     if (ret < 0)
         return ret;

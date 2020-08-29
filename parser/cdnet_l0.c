@@ -43,6 +43,8 @@ int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 
 int cdn0_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
 {
+    frame[0] = pkt->src.addr[2];
+    frame[1] = pkt->dst.addr[2];
     int ret = cdn0_to_payload(pkt, frame + 3);
     if (ret < 0)
         return ret;

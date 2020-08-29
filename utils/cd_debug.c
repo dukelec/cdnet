@@ -23,8 +23,8 @@ extern uart_t debug_uart;
 #endif
 
 static bool *dbg_en = NULL;
-static cd_sockaddr_t *dbg_dst = NULL;
-static cdnet_socket_t sock_dbg = { .port = 9 };
+static cdn_sockaddr_t *dbg_dst = NULL;
+static cdn_sock_t sock_dbg = { .port = 9 };
 
 static int dbg_lost_cnt = 0;
 
@@ -33,8 +33,8 @@ static int dbg_lost_cnt = 0;
 
 void _dprintf(char* format, ...)
 {
-    static cdnet_packet_t *pkt_cont = NULL;
-    cdnet_packet_t *pkt;
+    static cdn_pkt_t *pkt_cont = NULL;
+    cdn_pkt_t *pkt;
     uint32_t flags;
     va_list arg;
 
@@ -43,7 +43,7 @@ void _dprintf(char* format, ...)
 
     local_irq_save(flags);
 
-    if (cdnet_free_pkts.len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkts.len < DBG_MIN_PKT) {
         dbg_lost_cnt++;
         local_irq_restore(flags);
         return;
@@ -55,11 +55,11 @@ void _dprintf(char* format, ...)
         local_irq_restore(flags);
     } else {
         local_irq_restore(flags);
-        pkt = cdnet_packet_get(&cdnet_free_pkts);
+        pkt = cdn_pkt_get(&sock_dbg.ns->free_pkts);
         if (pkt) {
             pkt->dat[0] = 0x40;
             pkt->len = 1;
-            memcpy(&pkt->dst, dbg_dst, sizeof(cd_sockaddr_t));
+            pkt->dst = dbg_dst;
         } else {
             return;
         }
@@ -76,7 +76,7 @@ void _dprintf(char* format, ...)
     local_irq_save(flags);
     if (pkt->dat[pkt->len - 1] == '\n' || pkt->len == DBG_STR_LEN + 1 || pkt_cont) {
         local_irq_restore(flags);
-        cdnet_socket_sendto(&sock_dbg, pkt);
+        cdn_sock_sendto(&sock_dbg, pkt);
     } else {
         pkt_cont = pkt;
         local_irq_restore(flags);
@@ -88,7 +88,7 @@ void _dputs(char *str)
     if (!dbg_en || !*dbg_en)
         return;
 
-    if (cdnet_free_pkts.len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkts.len < DBG_MIN_PKT) {
         uint32_t flags;
         local_irq_save(flags);
         dbg_lost_cnt++;
@@ -96,13 +96,13 @@ void _dputs(char *str)
         return;
     }
 
-    cdnet_packet_t *pkt = cdnet_packet_get(&cdnet_free_pkts);
+    cdn_pkt_t *pkt = cdn_pkt_get(&sock_dbg.ns->free_pkts);
     if (pkt) {
         pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);
-        memcpy(&pkt->dst, dbg_dst, sizeof(cd_sockaddr_t));
-        cdnet_socket_sendto(&sock_dbg, pkt);
+        pkt->dst = dbg_dst;
+        cdn_sock_sendto(&sock_dbg, pkt);
     }
 }
 
@@ -118,18 +118,19 @@ void dhtoa(uint32_t val, char *buf)
     buf[8] = '\0';
 }
 
-void debug_init(bool *en, cd_sockaddr_t *dst)
+void debug_init(cdn_ns_t *ns, cdn_sockaddr_t *dst, bool *en)
 {
-    dbg_en = en;
+    sock_dbg.ns = ns;
     dbg_dst = dst;
-    cdnet_socket_bind(&sock_dbg, NULL);
+    dbg_en = en;
+    cdn_sock_bind(&sock_dbg);
 }
 
 void debug_flush(void)
 {
     static int dbg_lost_last = 0;
 
-    if (dbg_lost_last != dbg_lost_cnt && cdnet_free_pkts.len >= DBG_MIN_PKT) {
+    if (dbg_lost_last != dbg_lost_cnt && sock_dbg.ns->free_pkts.len >= DBG_MIN_PKT) {
         _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
         dbg_lost_last = dbg_lost_cnt;
     }
