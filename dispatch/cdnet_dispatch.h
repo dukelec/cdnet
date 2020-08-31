@@ -31,7 +31,7 @@
 #define CDN_SEQ_P0_RETRY_MAX    3
 #endif
 #ifndef CDN_SEQ_TX_PEND_MAX
-#define CDN_SEQ_TX_PEND_MAX     6
+#define CDN_SEQ_TX_PEND_MAX     6 // should < 64
 #endif
 
 #ifndef CDN_SEQ_TIMEOUT

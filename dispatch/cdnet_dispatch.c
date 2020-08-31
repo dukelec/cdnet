@@ -275,45 +275,62 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
 {
     list_node_t *pre, *pos;
 
-    if (tgt->p0_state) {
-        if (tgt->tgts.len) { // mcast tgt
-            cdn_tgt_t *st = container_of(tgt->tgts.first, cdn_tgt_t, node);
-            tgt->tx_seq_r = st->tx_seq_r;
-            bool all_finish = true;
+    if (tgt->tgts.len) { // mcast tgt
+        cdn_tgt_t *st = container_of(tgt->tgts.first, cdn_tgt_t, node);
+        tgt->tx_seq_r = st->tx_seq_r;
+        bool all_finish = true;
+        list_for_each(tgt->tgts, pre, pos) {
+            st = container_of(pos, cdn_tgt_t, node);
+            if (!(tgt->tx_seq_r & 0x80)) { // find the oldest tx_seq_r
+                if ((st->tx_seq_r & 0x80)
+                        || (st->tx_seq_r < tgt->tx_seq_r && tgt->tx_seq_r - st->tx_seq_r < 64)
+                        || (st->tx_seq_r > tgt->tx_seq_r && st->tx_seq_r - tgt->tx_seq_r > 64))
+                    tgt->tx_seq_r = st->tx_seq_r;
+            }
+            if (!(st->p0_state & 0x80))
+                all_finish = false;
+        }
+        if (all_finish) {
+            tgt->p0_state |= 0x80;
             list_for_each(tgt->tgts, pre, pos) {
                 st = container_of(pos, cdn_tgt_t, node);
-                if (tgt->p0_state & 0x80) {
-                    if (tgt->tx_seq_r != st->tx_seq_r)
-                        tgt->tx_seq_r = 0xff;
-                } else {
-                    all_finish = false;
-                    break;
-                }
+                st->p0_state = 0;
             }
-            if (all_finish)
-                tgt->p0_state |= 0x80;
         }
+    }
+
+    if (tgt->p0_state) {
+        tgt->t_last = get_systick();
 
         if (tgt->p0_state & 0x80) { // finish
-            if (tgt->p0_state == 0x81)
-                tgt->tx_seq = tgt->tx_seq_r;
-            else
-                tgt->tx_seq = 0; // init 0
             tgt->p0_state = 0;
+            tgt->p0_retry = 0;
 
-            if (tgt->tx_seq & 0x80) { // cancel all - seq_err
+            if (tgt->p0_state == 0x82) {
+                tgt->tx_seq = 0; // init 0
+                cdn_tgt_cancel_all(ns, tgt, CDN_RET_SEQ_ERR);
+            }
+
+            if (tgt->tx_seq_r & 0x80) { // cancel all - seq_err
+                tgt->tx_seq = 0xff;
                 cdn_tgt_cancel_all(ns, tgt, CDN_RET_SEQ_ERR);
 
             } else { // free succeeded
+                bool resend = false;
                 list_for_each(tgt->tx_pend, pre, pos) {
                     cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
-                    if (tgt->tx_seq == p->_seq)
-                        break;
-                    list_pick(tgt->tx_pend, pre, pos);
-                    pos = pre;
-                    p->ret = 0x80; // succeeded
-                    if (!(p->conf & CDN_CONF_NOT_FREE))
-                        cdn_list_put(&ns->free_pkts, &p->node);
+                    if (tgt->tx_seq_r == p->_seq)
+                        resend = true;
+                    if (!resend) {
+                        list_pick(tgt->tx_pend, pre, pos);
+                        pos = pre;
+                        p->ret = 0x80; // succeeded
+                        if (!(p->conf & CDN_CONF_NOT_FREE))
+                            cdn_list_put(&ns->free_pkts, &p->node);
+                    } else { // resend
+                        if (!(p->_seq & 0x80))
+                            cdn_send_frame(ns, p);
+                    }
                 }
             }
 
@@ -324,12 +341,27 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
 
                 } else { // cancel all - timeout
                     tgt->p0_state = 0;
+                    tgt->p0_retry = 0;
                     tgt->tx_seq = 0xff;
                     cdn_tgt_cancel_all(ns, tgt, CDN_RET_TIMEOUT);
                 }
             }
             return;
         }
+
+    } else if (!(tgt->tx_seq_r & 0x80)) {
+        list_for_each(tgt->tx_pend, pre, pos) {
+            cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
+            if (tgt->tx_seq_r == p->_seq)
+                break;
+            list_pick(tgt->tx_pend, pre, pos);
+            pos = pre;
+            p->ret = 0x80; // succeeded
+            if (!(p->conf & CDN_CONF_NOT_FREE))
+                cdn_list_put(&ns->free_pkts, &p->node);
+            tgt->t_last = get_systick();
+        }
+
     }
 
     if (tgt->tx_pend.len && get_systick() - tgt->t_tx_last > CDN_SEQ_TIMEOUT) {
@@ -355,10 +387,15 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
                     } else {
                         p->_seq = tgt->tx_seq;
                     }
-                    if (!cdn_send_frame(ns, p)) {
+                    int ret = cdn_send_frame(ns, p);
+                    if (!ret) {
                         tgt->tx_seq = (tgt->tx_seq + 1) & 0x7f;
                         p->_seq &= 0x7f;
                         cdn_list_put(&tgt->tx_pend, &p->node);
+                    } else {
+                        p->ret = 0x80 | ret;
+                        if (!(p->conf & CDN_CONF_NOT_FREE))
+                            cdn_list_put(&ns->free_pkts, &p->node);
                     }
                 }
                 tgt->t_tx_last = tgt->t_last = get_systick();
