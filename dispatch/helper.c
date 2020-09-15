@@ -21,25 +21,75 @@ cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net)
 
 cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
-    cdn_intf_t *intf = cdn_intf_search(ns, pkt->src->addr[1]);
-    if (!intf)
-        return NULL;
-    pkt->_s_mac = intf->mac;
+    cdn_intf_t *intf;
 
-    if (pkt->dst->addr[0] == 0xff || (pkt->src->addr[0] & 0xf0) != 0xa0) {
+    if ((pkt->dst->addr[0] & 0xf0) != 0xf0 && (pkt->dst->addr[0] & 0xf0) != 0xa0) {
+        intf = cdn_intf_search(ns, pkt->dst->addr[1]);
+        if (!intf)
+            return NULL;
+        memcpy(pkt->src.addr, pkt->dst.addr, 3);
+        pkt->src.addr[2] = intf->mac;
+        pkt->_s_mac = intf->mac;
         pkt->_d_mac = pkt->dst->addr[2];
-    } else {
-        int i;
-        for (i = 0; i < CDN_ROUTE_MAX; i++) {
-            if (ns->route[i] >> 8 == pkt->dst->addr[1]) {
-                pkt->_d_mac = ns->route[i] & 0xff;
-                break;
-            }
-        }
-        if (i == CDN_ROUTE_MAX)
-            pkt->_d_mac = ns->route[0] & 0xff; // use default gateway
+        return intf;
     }
-    return intf;
+
+    if ((pkt->dst->addr[0] & 0xf0) == 0xa0) {
+        intf = cdn_intf_search(ns, pkt->dst->addr[1]);
+        if (!intf) {
+            int i;
+            for (i = 0; i < CDN_ROUTE_MAX; i++) {
+                if (ns->route[i] >> 16 == pkt->dst->addr[1])
+                    break;
+            }
+            if (i == CDN_ROUTE_MAX)
+                i = 0; // use default gateway
+            intf = cdn_intf_search(ns, (ns->route[i] >> 8) & 0xff);
+            pkt->_d_mac = ns->route[i] & 0xff;
+        } else {
+            pkt->_d_mac = pkt->dst->addr[2];
+        }
+        pkt->src.addr[0] = pkt->dst.addr[0];
+        pkt->src.addr[1] = intf->net;
+        pkt->src.addr[2] = intf->mac;
+        pkt->_s_mac = intf->mac;
+        return intf;
+    }
+
+    { // mcast
+        uint8_t net;
+#ifdef CDN_TGT
+        cdn_tgt_t *tgt = cdn_tgt_search(ns, pkt->dst->addr[1] << 8 | pkt->dst->addr[2], NULL);
+        if (tgt && tgt->tgts.len) {
+            cdn_tgt_t *st = container_of(tgt->tgts.first, cdn_tgt_t, node);
+            net = st->id >> 8;
+        } else
+#endif
+        { // else
+            net = ns->intfs[0].net; // default interface
+        }
+
+        intf = cdn_intf_search(ns, net);
+        if (!intf) {
+            int i;
+            for (i = 0; i < CDN_ROUTE_MAX; i++) {
+                if (ns->route[i] >> 16 == net)
+                    break;
+            }
+            if (i == CDN_ROUTE_MAX)
+                i = 0; // use default gateway
+            intf = cdn_intf_search(ns, (ns->route[i] >> 8) & 0xff);
+            pkt->src.addr[0] = (pkt->dst.addr[0] & 0x08) ? 0xa8 : 0xa0;
+            pkt->_d_mac = ns->route[i] & 0xff;
+        } else {
+            pkt->src.addr[0] = (pkt->dst.addr[0] & 0x08) ? 0x88 : 0x80;
+            pkt->_d_mac = pkt->dst->addr[2];
+        }
+        pkt->src.addr[1] = intf->net;
+        pkt->src.addr[2] = intf->mac;
+        pkt->_s_mac = intf->mac;
+        return intf;
+    }
 }
 
 

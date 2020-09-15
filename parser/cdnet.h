@@ -11,8 +11,8 @@
  *
  *              local link     unique local    multicast
  * level0:       00:NN:MM
- * level1:       80:NN:MM        a0:NN:MM       ff:MH:ML
- *  `-with seq:  88:NN:MM        a8:NN:MM       ff:MH:ML
+ * level1:       80:NN:MM        a0:NN:MM       f0:MH:ML
+ *  `-with seq:  88:NN:MM        a8:NN:MM       f8:MH:ML
  * level2:       c0:NN:MM
  *  `-with seq:  c8:NN:MM
  *

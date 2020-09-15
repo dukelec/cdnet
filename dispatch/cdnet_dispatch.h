@@ -16,11 +16,11 @@
 #include "cd_list.h"
 #include "rbtree.h"
 
-#ifndef CDN_INTF
+#ifndef CDN_INTF_MAX
 #define CDN_INTF_MAX            1
 #endif
 
-#ifndef CDN_ROUTE
+#ifndef CDN_ROUTE_MAX
 #define CDN_ROUTE_MAX           1
 #endif
 
@@ -105,9 +105,9 @@ typedef struct {
 #ifdef CDN_L2
     list_head_t     l2_rx;
 #endif
-    cdn_intf_t      intfs[CDN_INTF_MAX];
-
-    uint16_t        route[CDN_ROUTE_MAX]; // net:mac, first is default gateway
+    cdn_intf_t      intfs[CDN_INTF_MAX];  //          <--. (search intf)
+                                          //             |
+    uint32_t        route[CDN_ROUTE_MAX]; // remote_net:net:mac, first is default gateway
 } cdn_ns_t; // name space
 
 typedef struct {

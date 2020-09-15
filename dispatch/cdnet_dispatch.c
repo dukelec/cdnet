@@ -61,7 +61,6 @@ void cdn_routine(cdn_ns_t *ns)
 #endif
                 // addition in: _l_net, _l0_lp (central only)
                 ret = cdn0_from_frame(frame, pkt);
-                dev->put_free_frame(dev, frame);
 
                 if (ret) {
                     cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
@@ -78,7 +77,6 @@ void cdn_routine(cdn_ns_t *ns)
             } else if (!(frame->dat[3] & 0x40)) { // rx l1
                 // addition in: _l_net; out: _seq
                 ret = cdn1_from_frame(frame, pkt);
-                dev->put_free_frame(dev, frame);
 
                 if (ret) {
                     // TODO: check dst net match or not
@@ -186,7 +184,6 @@ void cdn_routine(cdn_ns_t *ns)
 #ifdef CDN_L2
                 // addition in: _l_net; out: _seq, _l2_frag, l2_uf
                 ret = cdn2_from_frame(frame, pkt);
-                dev->put_free_frame(dev, frame);
 
                 if (!ret) {
                     cdn_tgt_t *tgt = cdn_tgt_search(ns, (intf->net << 8) | frame->dat[0], NULL);
@@ -243,9 +240,11 @@ void cdn_routine(cdn_ns_t *ns)
             }
 #else
             d_verbose("rx: unknown frame\n");
-            dev->put_free_frame(dev, frame);
 #endif // CDN_L2
         }
+
+        if (frame)
+            dev->put_free_frame(dev, frame);
     }
 
     // tgt tx & gc
@@ -447,8 +446,7 @@ static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type)
     memset(p, 0, offsetof(cdn_pkt_t, dat));
     p->src.port = CDN_DEF_PORT;
     p->dst.port = 0;
-    cdn_set_addr(p->src.addr, 0x80, intf->net, intf->mac);
-    cdn_set_addr(p->dst.addr, tgt->tgts.len ? 0xff : 0x80, tgt->id >> 8, tgt->id & 0xff);
+    cdn_set_addr(p->dst.addr, tgt->tgts.len ? 0xf0 : 0x80, tgt->id >> 8, tgt->id & 0xff);
     if (type == 1) { // get
         p->len = 1;
         p->dat[0] = 0x00;
@@ -509,7 +507,7 @@ int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
     int ret;
 
-    if (pkt->src.addr[0] == 0) { // l0
+    if (pkt->dst.addr[0] == 0) { // l0
 #ifdef CDN_L0_C
         if (pkt->src.port == CDN_DEF_PORT) {
             cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->dst.addr[1] << 8) | pkt->dst.addr[2], NULL);
@@ -537,13 +535,13 @@ int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt)
             cdn_list_put(&ns->free_pkts, &pkt->node);
         return ret;
 
-    } else if (!(pkt->src.addr[0] & 0x40)) { // l1
+    } else if (!(pkt->dst.addr[0] & 0x40) || (pkt->dst.addr[0] & 0xf0) == 0xf0) { // l1
 
-        if (pkt->src.addr[0] & 0x8) { // seq
+        if (pkt->dst.addr[0] & 0x8) { // seq
 #ifdef CDN_TGT
             cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->dst.addr[1] << 8) | pkt->dst.addr[2], NULL);
             if (!tgt) {
-                if (pkt->dst.addr[0] != 0xff) // not alloc for mcast
+                if ((pkt->dst.addr[0] & 0xf0) != 0xf0) // not alloc for mcast
                     tgt = cdn_tgt_get(&ns->free_tgts);
                 if (tgt) {
                     memset(tgt, 0, sizeof(cdn_tgt_t));
@@ -576,7 +574,7 @@ int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt)
 
     } else { // l2
 #ifdef CDN_L2
-        if (pkt->src.addr[0] & 0x8) { // seq
+        if (pkt->dst.addr[0] & 0x8) { // seq
 
             cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->dst.addr[1] << 8) | pkt->dst.addr[2], NULL);
             if (!tgt) {

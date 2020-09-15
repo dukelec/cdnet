@@ -66,7 +66,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     cdn_multi_t multi = CDN_MULTI_NONE;
 
     multi |= (src->addr[0] & 0xf0) == 0xa0 ? CDN_MULTI_NET : CDN_MULTI_NONE;
-    multi |= dst->addr[0] == 0xff ? CDN_MULTI_CAST : CDN_MULTI_NONE;
+    multi |= (dst->addr[0] & 0xf0) == 0xf0 ? CDN_MULTI_CAST : CDN_MULTI_NONE;
     *payload = CDN_HDR_L1L2 | (multi << 4); // hdr
 
     if (multi & CDN_MULTI_NET) {
@@ -132,7 +132,7 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
         src->addr[2] = pkt->_s_mac;
     }
     if (multi != CDN_MULTI_NONE) {
-        dst->addr[0] = (multi & CDN_MULTI_CAST) ? 0xff : (seq ? 0xa8 : 0xa0);
+        dst->addr[0] = ((multi & CDN_MULTI_CAST) ? 0xf0 : 0xa0) | (seq ? 8 : 0);
         dst->addr[1] = *buf++;
         dst->addr[2] = *buf++;
     } else {
