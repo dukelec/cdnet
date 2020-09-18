@@ -17,7 +17,7 @@ static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type);
 #endif
 cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port);
 int cdn_sock_insert(cdn_sock_t *sock);
-cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net);
+cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net, bool route, int *r_idx);
 cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt); // set _s_mac, _d_mac
 int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt);
 
@@ -68,6 +68,7 @@ void cdn_routine(cdn_ns_t *ns)
                         cdn_list_put(&sock->rx_head, &pkt->node);
                     } else {
                         d_verbose("rx: l0 no sock\n");
+                        cdn_list_put(&ns->free_pkts, &pkt->node);
                     }
                 } else {
                     d_verbose("rx: l0 frame err: %d\n", ret);
@@ -81,8 +82,7 @@ void cdn_routine(cdn_ns_t *ns)
                 if (ret) {
                     // TODO: check dst net match or not
 #ifdef CDN_TGT
-                    cdn_tgt_t *parent;
-                    cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->src.addr[1] << 8) | pkt->src.addr[2], &parent);
+                    cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->src.addr[1] << 8) | pkt->src.addr[2], NULL);
 #endif
                     if (pkt->src.addr[0] & 0x8) { // seq
 #ifdef CDN_TGT
@@ -95,6 +95,7 @@ void cdn_routine(cdn_ns_t *ns)
                                     cdn_list_put(&sock->rx_head, &pkt->node);
                                 } else {
                                     d_verbose("rx: l1 no sock\n");
+                                    cdn_list_put(&ns->free_pkts, &pkt->node);
                                 }
                             } else {
                                 d_verbose("rx: l1 seq: %d != %d\n", pkt->_seq, tgt->rx_seq);
@@ -121,6 +122,7 @@ void cdn_routine(cdn_ns_t *ns)
                                     tgt->p0_state |= 0x80;
                                 }
                             }
+                            cdn_list_put(&ns->free_pkts, &pkt->node);
 
                         } else if(pkt->src.port == CDN_DEF_PORT && pkt->dst.port == 0) { // p0 report & set
                             if (pkt->len == 1 && pkt->dat[0] == 0x00) { // p0 check
@@ -205,7 +207,7 @@ void cdn_routine(cdn_ns_t *ns)
                                 if (pkt->_l2_frag <= CDN_FRAG_FIRST && tgt->_l2_rx) {
                                     cdn_list_put(&ns->free_pkts, &tgt->_l2_rx->node);
                                     tgt->_l2_rx = NULL;
-                                    d_warn("rx: l2 drop old _l2_rx\n");
+                                    d_verbose("rx: l2 drop old _l2_rx\n");
                                 }
                                 if (pkt->_l2_frag) {
                                     if (tgt->_l2_rx) {
@@ -240,6 +242,7 @@ void cdn_routine(cdn_ns_t *ns)
             }
 #else
             d_verbose("rx: unknown frame\n");
+            cdn_list_put(&ns->free_pkts, &pkt->node);
 #endif // CDN_L2
         }
 
@@ -302,8 +305,6 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
         tgt->t_last = get_systick();
 
         if (tgt->p0_state & 0x80) { // finish
-            tgt->p0_state = 0;
-            tgt->p0_retry = 0;
 
             if (tgt->p0_state == 0x82) {
                 tgt->tx_seq = 0; // init 0
@@ -333,6 +334,9 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
                 }
             }
 
+            tgt->p0_state = 0;
+            tgt->p0_retry = 0;
+
         } else {
             if (get_systick() - tgt->t_tx_last >= CDN_SEQ_TIMEOUT) {
                 if (++tgt->p0_retry < CDN_SEQ_P0_RETRY_MAX) {
@@ -360,17 +364,13 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
                 cdn_list_put(&ns->free_pkts, &p->node);
             tgt->t_last = get_systick();
         }
-
-    }
-
-    if (tgt->tx_pend.len && get_systick() - tgt->t_tx_last > CDN_SEQ_TIMEOUT) {
-        cdn_send_p0(ns, tgt, 1); // get
-        return;
     }
 
     if (tgt->tx_pend.len < CDN_SEQ_TX_PEND_MAX && tgt->tx_wait.len) {
         if (tgt->tx_seq & 0x80) {
             cdn_send_p0(ns, tgt, 2); // set 0
+            return;
+
         } else {
             while (tgt->tx_pend.len < CDN_SEQ_TX_PEND_MAX) {
                 cdn_pkt_t *p = cdn_pkt_get(&tgt->tx_wait);
@@ -401,6 +401,9 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
             }
         }
     }
+
+    if (tgt->tx_pend.len && get_systick() - tgt->t_tx_last > CDN_SEQ_TIMEOUT)
+        cdn_send_p0(ns, tgt, 1); // get
 }
 
 
@@ -430,12 +433,13 @@ static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type)
 {
     list_node_t *pre, *pos;
     cdn_intf_t *intf;
+    int idx;
 
     if (tgt->tgts.len) { // TODO: support multi-intf for mcast
         cdn_tgt_t *st = container_of(tgt->tgts.first, cdn_tgt_t, node);
-        intf = cdn_intf_search(ns, st->id >> 8);
+        intf = cdn_intf_search(ns, st->id >> 8, true, &idx);
     } else {
-        intf = cdn_intf_search(ns, tgt->id >> 8);
+        intf = cdn_intf_search(ns, tgt->id >> 8, true, &idx);
     }
     if (!intf)
         return -1;
@@ -446,7 +450,7 @@ static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type)
     memset(p, 0, offsetof(cdn_pkt_t, dat));
     p->src.port = CDN_DEF_PORT;
     p->dst.port = 0;
-    cdn_set_addr(p->dst.addr, tgt->tgts.len ? 0xf0 : 0x80, tgt->id >> 8, tgt->id & 0xff);
+    cdn_set_addr(p->dst.addr, tgt->tgts.len ? 0xf0 : (idx >= 0 ? 0xa0 : 0x80), tgt->id >> 8, tgt->id & 0xff);
     if (type == 1) { // get
         p->len = 1;
         p->dat[0] = 0x00;
