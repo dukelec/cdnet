@@ -12,7 +12,7 @@
 
 int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 {
-    const uint8_t *s_addr = &pkt->src.addr;
+    const uint8_t *s_addr = pkt->src.addr;
     uint8_t *buf = payload + 1;
 
     cdn_assert((pkt->l2_uf & ~7) == 0);
@@ -33,7 +33,7 @@ int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 
     cdn_assert(buf - payload + pkt->len <= 253);
     memcpy(buf, pkt->dat, pkt->len);
-    return buf - payload + len;
+    return buf - payload + pkt->len;
 }
 
 // addition in: _seq, _l2_frag, l2_uf
@@ -51,8 +51,8 @@ int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 
 int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 {
-    uint8_t *s_addr = &pkt->src.addr;
-    uint8_t *d_addr = &pkt->dst.addr;
+    uint8_t *s_addr = pkt->src.addr;
+    uint8_t *d_addr = pkt->dst.addr;
     const uint8_t *buf = payload + 1;
 
     cdn_assert((*payload & 0xc0) == 0xc0);

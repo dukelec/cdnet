@@ -10,6 +10,8 @@
 #ifndef __CD_DEBUG_H__
 #define __CD_DEBUG_H__
 
+#include "cdnet_dispatch.h"
+
 #ifndef d_printf
 #define d_printf(fmt, ...)          _dprintf(fmt, ## __VA_ARGS__)
 #endif
@@ -71,8 +73,8 @@
 void _dprintf(char *format, ...);
 void _dputs(char *str);
 void dhtoa(uint32_t val, char *buf);
-//void debug_init(void);
-//void debug_init(cdn_ns_t *ns, cdn_sockaddr_t *dst, bool *en);
+void debug_uart_init(void);
+void debug_init(cdn_ns_t *ns, cdn_sockaddr_t *dst, bool *en);
 void debug_flush(void);
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);

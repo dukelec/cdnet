@@ -53,6 +53,11 @@ void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
 //      list_pick(head, pre, pos);
 //      pos = pre;
 
+// read only version:
+#define list_for_each_ro(head, pos)                             \
+    for (pos = (head)->first; pos != NULL;                      \
+         pos = (pos ? (pos)->next : (head)->first))
+
 #define list_head_init(head)                                    \
     memset(head, 0, sizeof(list_head_t))
 

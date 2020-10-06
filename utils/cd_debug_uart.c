@@ -101,7 +101,7 @@ void dhtoa(uint32_t val, char *buf)
     buf[8] = '\0';
 }
 
-void debug_init(void)
+void debug_uart_init(void)
 {
     int i;
     for (i = 0; i < DBG_LEN; i++)

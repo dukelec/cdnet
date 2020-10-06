@@ -24,6 +24,7 @@
 #define __CDNET_H__
 
 #include "cd_utils.h"
+#include "cd_list.h"
 
 
 #ifndef cdn_assert
@@ -110,7 +111,7 @@ typedef struct {
 #endif
 #ifdef CDN_L2
     uint8_t         l2_uf;  // user flag
-    cdnet_frag_t    _l2_frag;
+    cdn_frag_t      _l2_frag;
 #endif
 
     uint8_t         conf;
@@ -136,11 +137,11 @@ int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
 int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
 
 int cdn0_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
-int cdn0_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+int cdn0_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
 int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
-int cdn1_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+int cdn1_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
 int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
-int cdn2_from_frame(const uint8_t *frame, uint8_t len, cdn_pkt_t *pkt);
+int cdn2_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
 
 static inline void cdn_set_addr(uint8_t *addr, uint8_t a0, uint8_t a1, uint8_t a2)
 {

@@ -8,28 +8,21 @@
  */
 
 #include "cdnet_dispatch.h"
+#include "cd_debug.h"
 
 #ifdef CDN_TGT
-cdn_tgt_t *cdn_tgt_search(cdn_ns_t *ns, uint16_t id, cdn_tgt_t **parent);
 static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt);
-static void cdn_tgt_cancel_all(cdn_ns_t *ns, cdn_tgt_t tgt, int ret_val);
-static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type);
+static void cdn_tgt_cancel_all(cdn_ns_t *ns, cdn_tgt_t *tgt, int ret_val);
+static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t *tgt, int type);
 #endif
-cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port);
-int cdn_sock_insert(cdn_sock_t *sock);
-cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net, bool route, int *r_idx);
-cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt); // set _s_mac, _d_mac
-int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt);
 
 
 void cdn_routine(cdn_ns_t *ns)
 {
-    list_node_t *pre, *pos;
-
     // rx
     for (int i = 0; i < CDN_INTF_MAX; i++) {
         cdn_intf_t *intf = &ns->intfs[i];
-        cd_frame_t *frame;
+        cd_frame_t *frame = NULL;
         cdn_pkt_t *pkt;
         cd_dev_t *dev = intf->dev;
         int ret;
@@ -60,7 +53,7 @@ void cdn_routine(cdn_ns_t *ns)
                 }
 #endif
                 // addition in: _l_net, _l0_lp (central only)
-                ret = cdn0_from_frame(frame, pkt);
+                ret = cdn0_from_frame(frame->dat, pkt);
 
                 if (ret) {
                     cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
@@ -77,7 +70,7 @@ void cdn_routine(cdn_ns_t *ns)
 
             } else if (!(frame->dat[3] & 0x40)) { // rx l1
                 // addition in: _l_net; out: _seq
-                ret = cdn1_from_frame(frame, pkt);
+                ret = cdn1_from_frame(frame->dat, pkt);
 
                 if (ret) {
                     // TODO: check dst net match or not
@@ -185,7 +178,7 @@ void cdn_routine(cdn_ns_t *ns)
             } else { // rx l2
 #ifdef CDN_L2
                 // addition in: _l_net; out: _seq, _l2_frag, l2_uf
-                ret = cdn2_from_frame(frame, pkt);
+                ret = cdn2_from_frame(frame->dat, pkt);
 
                 if (!ret) {
                     cdn_tgt_t *tgt = cdn_tgt_search(ns, (intf->net << 8) | frame->dat[0], NULL);
@@ -239,11 +232,11 @@ void cdn_routine(cdn_ns_t *ns)
                     d_verbose("rx: l2 frame err: %d\n", ret);
                     cdn_list_put(&ns->free_pkts, &pkt->node);
                 }
-            }
 #else
-            d_verbose("rx: unknown frame\n");
-            cdn_list_put(&ns->free_pkts, &pkt->node);
+                d_verbose("rx: unknown frame\n");
+                cdn_list_put(&ns->free_pkts, &pkt->node);
 #endif // CDN_L2
+            }
         }
 
         if (frame)
@@ -252,15 +245,16 @@ void cdn_routine(cdn_ns_t *ns)
 
     // tgt tx & gc
 #ifdef CDN_TGT
-    list_for_each(ns->tgts, pre, pos) {
+    list_node_t *pre, *pos;
+    list_for_each(&ns->tgts, pre, pos) {
         cdn_tgt_t *t = container_of(pos, cdn_tgt_t, node);
         cdn_tgt_routine(ns, t);
         if (!t->tgts.len && !t->tx_pend.len && !t->tx_wait.len && get_systick() - t->t_last > CDN_TGT_GC) {
-            list_pick(ns->tgts, pre, pos);
+            list_pick(&ns->tgts, pre, pos);
             pos = pre;
 #ifdef CDN_L2
             if (t->_l2_rx) {
-                cdn_list_put(&ns->free_pkts, &tgt->_l2_rx->node);
+                cdn_list_put(&ns->free_pkts, &t->_l2_rx->node);
                 t->_l2_rx = NULL;
             }
 #endif
@@ -281,7 +275,7 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
         cdn_tgt_t *st = container_of(tgt->tgts.first, cdn_tgt_t, node);
         tgt->tx_seq_r = st->tx_seq_r;
         bool all_finish = true;
-        list_for_each(tgt->tgts, pre, pos) {
+        list_for_each(&tgt->tgts, pre, pos) {
             st = container_of(pos, cdn_tgt_t, node);
             if (!(tgt->tx_seq_r & 0x80)) { // find the oldest tx_seq_r
                 if ((st->tx_seq_r & 0x80)
@@ -294,7 +288,7 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
         }
         if (all_finish) {
             tgt->p0_state |= 0x80;
-            list_for_each(tgt->tgts, pre, pos) {
+            list_for_each(&tgt->tgts, pre, pos) {
                 st = container_of(pos, cdn_tgt_t, node);
                 st->p0_state = 0;
             }
@@ -317,12 +311,12 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
 
             } else { // free succeeded
                 bool resend = false;
-                list_for_each(tgt->tx_pend, pre, pos) {
+                list_for_each(&tgt->tx_pend, pre, pos) {
                     cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
                     if (tgt->tx_seq_r == p->_seq)
                         resend = true;
                     if (!resend) {
-                        list_pick(tgt->tx_pend, pre, pos);
+                        list_pick(&tgt->tx_pend, pre, pos);
                         pos = pre;
                         p->ret = 0x80; // succeeded
                         if (!(p->conf & CDN_CONF_NOT_FREE))
@@ -353,11 +347,11 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
         }
 
     } else if (!(tgt->tx_seq_r & 0x80)) {
-        list_for_each(tgt->tx_pend, pre, pos) {
+        list_for_each(&tgt->tx_pend, pre, pos) {
             cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
             if (tgt->tx_seq_r == p->_seq)
                 break;
-            list_pick(tgt->tx_pend, pre, pos);
+            list_pick(&tgt->tx_pend, pre, pos);
             pos = pre;
             p->ret = 0x80; // succeeded
             if (!(p->conf & CDN_CONF_NOT_FREE))
@@ -407,21 +401,21 @@ static void cdn_tgt_routine(cdn_ns_t *ns, cdn_tgt_t *tgt)
 }
 
 
-static void cdn_tgt_cancel_all(cdn_ns_t *ns, cdn_tgt_t tgt, int ret_val)
+static void cdn_tgt_cancel_all(cdn_ns_t *ns, cdn_tgt_t *tgt, int ret_val)
 {
     list_node_t *pre, *pos;
 
-    list_for_each(tgt->tx_pend, pre, pos) {
+    list_for_each(&tgt->tx_pend, pre, pos) {
         cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
-        list_pick(tgt->tx_pend, pre, pos);
+        list_pick(&tgt->tx_pend, pre, pos);
         pos = pre;
         p->ret = 0x80 | ret_val;
         if (!(p->conf & CDN_CONF_NOT_FREE))
             cdn_list_put(&ns->free_pkts, &p->node);
     }
-    list_for_each(tgt->tx_wait, pre, pos) {
+    list_for_each(&tgt->tx_wait, pre, pos) {
         cdn_pkt_t *p = container_of(pos, cdn_pkt_t, node);
-        list_pick(tgt->tx_pend, pre, pos);
+        list_pick(&tgt->tx_pend, pre, pos);
         pos = pre;
         p->ret = 0x80 | ret_val;
         if (!(p->conf & CDN_CONF_NOT_FREE))
@@ -429,9 +423,9 @@ static void cdn_tgt_cancel_all(cdn_ns_t *ns, cdn_tgt_t tgt, int ret_val)
     }
 }
 
-static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type)
+static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t *tgt, int type)
 {
-    list_node_t *pre, *pos;
+    list_node_t *pos;
     cdn_intf_t *intf;
     int idx;
 
@@ -462,8 +456,8 @@ static int cdn_send_p0(cdn_ns_t *ns, cdn_tgt_t tgt, int type)
         tgt->p0_state = 2;
     }
     tgt->p0_state = type;
-    list_for_each(tgt->tgts, pre, pos) {
-        st = container_of(pos, cdn_tgt_t, node);
+    list_for_each_ro(&tgt->tgts, pos) {
+        cdn_tgt_t *st = container_of(pos, cdn_tgt_t, node);
         st->p0_state = type;
     }
     cdn_send_pkt(ns, p);

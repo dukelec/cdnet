@@ -12,17 +12,17 @@
 
 int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 {
-    const cdn_sockaddr_t *src = pkt->src;
-    const cdn_sockaddr_t *dst = pkt->dst;
+    const cdn_sockaddr_t *src = &pkt->src;
+    const cdn_sockaddr_t *dst = &pkt->dst;
     const uint8_t *dat = pkt->dat;
     uint8_t len = pkt->len;
 
-    cd_assert(dst->addr[0] == 0x00);
-    cd_assert((src->port == CDN_DEF_PORT && dst->port <= 63) || dst->port == CDN_DEF_PORT);
+    cdn_assert(dst->addr[0] == 0x00);
+    cdn_assert((src->port == CDN_DEF_PORT && dst->port <= 63) || dst->port == CDN_DEF_PORT);
 
     if (src->port == CDN_DEF_PORT) { // out request
 #ifndef CDN_L0_C
-        cd_assert(false); // not support
+        cdn_assert(false); // not support
 #endif
         *payload = dst->port; // hdr
     } else { // out reply
@@ -36,12 +36,12 @@ int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
         }
     }
 
-    cd_assert(len + 1 <= 253);
+    cdn_assert(len + 1 <= 253);
     memcpy(payload + 1, dat, len);
     return len + 1;
 }
 
-int cdn0_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
+int cdn0_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->src.addr[2];
     frame[1] = pkt->dst.addr[2];
@@ -55,11 +55,11 @@ int cdn0_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
 
 int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 {
-    cdn_sockaddr_t *src = pkt->src;
-    cdn_sockaddr_t *dst = pkt->dst;
+    cdn_sockaddr_t *src = &pkt->src;
+    cdn_sockaddr_t *dst = &pkt->dst;
     uint8_t *dat = pkt->dat;
 
-    cd_assert(!(*payload & 0x80));
+    cdn_assert(!(*payload & 0x80));
     src->addr[0] = 0;
     src->addr[1] = pkt->_l_net;
     dst->addr[0] = 0;
@@ -77,7 +77,7 @@ int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
             *dat++ = (*payload & 0x1f) | CDN0_SHARE_LEFT;
         }
 #else
-        cd_assert(false); // not support
+        cdn_assert(false); // not support
 #endif
     } else { // in request
         src->port = CDN_DEF_PORT;

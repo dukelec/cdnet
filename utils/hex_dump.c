@@ -10,6 +10,7 @@
  */
 
 #include "cd_utils.h"
+#include "cd_debug.h"
 
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int limit)

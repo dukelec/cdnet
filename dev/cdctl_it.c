@@ -8,6 +8,7 @@
  */
 
 #include "cdctl_it.h"
+#include "cd_debug.h"
 
 #define CDCTL_MASK (BIT_FLAG_RX_PENDING |           \
             BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \

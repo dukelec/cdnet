@@ -118,6 +118,17 @@ typedef struct {
 } cdn_sock_t;
 
 
+#ifdef CDN_TGT
+cdn_tgt_t *cdn_tgt_search(cdn_ns_t *ns, uint16_t id, cdn_tgt_t **parent);
+#endif
+cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port);
+int cdn_sock_insert(cdn_sock_t *sock);
+cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net, bool route, int *r_idx);
+cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt); // set _s_mac, _d_mac
+int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt);
+int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt);
+
+
 int cdn_sock_bind(cdn_sock_t *sock);
 int cdn_sock_sendto(cdn_sock_t *sock, cdn_pkt_t *pkt);
 cdn_pkt_t *cdn_sock_recvfrom(cdn_sock_t *sock);

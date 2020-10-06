@@ -59,7 +59,7 @@ void _dprintf(char* format, ...)
         if (pkt) {
             pkt->dat[0] = 0x40;
             pkt->len = 1;
-            pkt->dst = dbg_dst;
+            pkt->dst = *dbg_dst;
         } else {
             return;
         }
@@ -101,7 +101,7 @@ void _dputs(char *str)
         pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);
-        pkt->dst = dbg_dst;
+        pkt->dst = *dbg_dst;
         cdn_sock_sendto(&sock_dbg, pkt);
     }
 }

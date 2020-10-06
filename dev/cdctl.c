@@ -8,6 +8,7 @@
  */
 
 #include "cdctl.h"
+#include "cd_debug.h"
 
 
 uint8_t cdctl_read_reg(cdctl_dev_t *dev, uint8_t reg)

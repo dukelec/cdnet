@@ -60,8 +60,8 @@ static int cal_port_val(uint16_t src, uint16_t dst,
 int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 {
     uint8_t s_port_size, d_port_size;
-    const cdn_sockaddr_t *src = pkt->src;
-    const cdn_sockaddr_t *dst = pkt->dst;
+    const cdn_sockaddr_t *src = &pkt->src;
+    const cdn_sockaddr_t *dst = &pkt->dst;
     uint8_t *buf = payload + 1;
     cdn_multi_t multi = CDN_MULTI_NONE;
 
@@ -98,7 +98,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 }
 
 // addition in: _seq, _s_mac, _d_mac
-int cdn1_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
+int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->_s_mac;
     frame[1] = pkt->_d_mac;
@@ -113,8 +113,8 @@ int cdn1_to_frame(cdn_pkt_t *pkt, uint8_t *frame)
 int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 {
     uint8_t s_port_size, d_port_size;
-    cdn_sockaddr_t *src = pkt->src;
-    cdn_sockaddr_t *dst = pkt->dst;
+    cdn_sockaddr_t *src = &pkt->src;
+    cdn_sockaddr_t *dst = &pkt->dst;
 
     const uint8_t *buf = payload + 1;
     cdn_assert((*payload & 0xc0) == 0x80);
