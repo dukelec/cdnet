@@ -22,7 +22,7 @@ void cdn_routine(cdn_ns_t *ns)
     // rx
     for (int i = 0; i < CDN_INTF_MAX; i++) {
         cdn_intf_t *intf = &ns->intfs[i];
-        cd_frame_t *frame = NULL;
+        cd_frame_t *frame;
         cdn_pkt_t *pkt;
         cd_dev_t *dev = intf->dev;
         int ret;
@@ -55,7 +55,7 @@ void cdn_routine(cdn_ns_t *ns)
                 // addition in: _l_net, _l0_lp (central only)
                 ret = cdn0_from_frame(frame->dat, pkt);
 
-                if (ret) {
+                if (!ret) {
                     cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
                     if (!ret && sock) {
                         cdn_list_put(&sock->rx_head, &pkt->node);
@@ -72,7 +72,7 @@ void cdn_routine(cdn_ns_t *ns)
                 // addition in: _l_net; out: _seq
                 ret = cdn1_from_frame(frame->dat, pkt);
 
-                if (ret) {
+                if (!ret) {
                     // TODO: check dst net match or not
 #ifdef CDN_TGT
                     cdn_tgt_t *tgt = cdn_tgt_search(ns, (pkt->src.addr[1] << 8) | pkt->src.addr[2], NULL);
@@ -237,10 +237,10 @@ void cdn_routine(cdn_ns_t *ns)
                 cdn_list_put(&ns->free_pkts, &pkt->node);
 #endif // CDN_L2
             }
-        }
 
-        if (frame)
-            dev->put_free_frame(dev, frame);
+            if (frame)
+                dev->put_free_frame(dev, frame);
+        }
     }
 
     // tgt tx & gc
