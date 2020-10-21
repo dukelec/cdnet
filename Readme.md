@@ -5,7 +5,7 @@ CDNET is a high layer protocol for CDBUS
 2. [Level 0 Format](#level-0-format)
 3. [Level 1 Format](#level-1-format)
 4. [Level 2 Format](#level-2-format)
-5. [Specific Ports](#specific-ports)
+5. [Port Allocation Recommendation](#port-allocation-recommendation)
 6. [Examples](#examples)
 7. [More Resources](#more-resources)
 
@@ -38,7 +38,7 @@ First byte:
 |-------- |---------------------------------------------------|
 | [7]     | Always 0: Level 0                                 |
 | [6]     | Always 0: request                                 |
-| [5:0]   | dst_port, range 0~63                              |
+| [5:0]   | dst_port, range 0 ~ 0x3f                          |
 
 The second byte and after: command parameters.
 
@@ -162,14 +162,12 @@ Note:
 1: Append 1 byte `SEQ_NUM`, see [Port 0](#port-0).
 
 
-## Specific Ports
+## Port Allocation Recommendation
 
-Ports 0 through 9 are cdnet-specific (undefined ports are reserved),
-Port 10 and later are freely assigned by user.
+It is recommended that ports 0 to 0xf be used for general purpose.
+Among them, port 0 is used for sequence control of cdnet, and port 1 is used for device information query.
 
-All specific ports are optional,
-and user can only implement some of the port features.
-It is recommended to implement at least the basic part of port 1 (device info).
+All ports in this section are optional, but it is recommended to implement the port 1 function of the string version (device info).
 
 ### Port 0
 
@@ -224,76 +222,15 @@ Check device_info string:
   Write [0x00]
   Return [0x80, "device_info"]
 
-Search device by filters (need by mac auto allocation):
-  Write [0x01, max_time, mac_start, mac_end, "string"]
-  Return [0x80, "device_info"] after a random time in range [0, max_time]
-    only if "device_info" contain "string" (always true for empty string) and
-    current mac address is in the range [mac_start, mac_end]
-  Not return otherwise
+Check binary version of device information and version data:
+  Write [0x01]
+  Return [0x80, (User-defined binary data)]
+
 ```
 Example of `device_info`:  
   `M: model; S: serial string; HW: hardware version; SW: software version` ...  
 Do not care about the field order, and should at least include the model field.
 
-### Port 2
-
-Set device baud rate.
-```
-Type of baud_rate is uint32_t, e.g. 115200;
-Type of intf is uint8_t.
-
-Set current interface baud rate：
-  Write [0x20, baud_rate]                       // single baud rate
-  Write [0x21, baud_rate_low, baud_rate_high]   // dual baud rate
-  Return: [0x80]                                // change baud rate after return
-
-Set baud rate for specified interface:
-  Write [0x22, intf, baud_rate]
-  Write [0x23, intf, baud_rate_low, baud_rate_high]
-  Return: [0x80]
-
-Check baud rate for specified interface:
-  Write [0x00, intf]
-  Return: [0x80, baud_rate] or [0x80, baud_rate_low, baud_rate_high]
-```
-
-### Port 3
-
-Set device address.
-```
-Type of mac and net is uint8_t;
-Type of intf is uint8_t;
-Type of "string" is any length of string, include empty.
-
-Change mac address for current interface:
-  Write [0x20, new_mac, "string"]:                  // "string" is optional (need by mac auto allocation)
-  Return [0x80] if "device_info" contain "string"   // change mac address after return
-  Not return and ignore the command otherwise
-
-Change net id for current interface:
-  Write [0x21, new_net]
-  Return: [0x80]                                    // change net id after return
-
-Check net id of current interface:
-  Write [0x01]
-  Return: [0x80, net]
-
-Set mac address for specified interface:
-  Write [0x28, intf, new_mac]
-  Return: [0x80]
-
-Set net id for specified interface:
-  Write [0x29, intf, new_net]
-  Return: [0x80]
-
-Check mac address for specified interface:
-  Write [0x08, intf]
-  Return: [0x80, mac]
-
-Check net id for specified interface:
-  Write [0x09, intf]
-  Return: [0x80, net]
-```
 
 
 ## Examples
@@ -327,7 +264,7 @@ The Level 1 Format:
 
 ### Code Examples
 
-How to use this library refer to `stepper_motor_controller`, `cdbus_bridge` or `cdnet_tun` projects;  
+How to use this library refer to `cd_mdrv_step` (stepper motor controller), `cdbus_bridge` or `cdnet_tun` projects;  
 How to control CDCTL-Bx/Hx refer to `dev/cdctl_xxx`.
 
 
