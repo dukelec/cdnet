@@ -278,9 +278,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             gpio_set_value(dev->spi->ns_pin, 0);
             spi_dma_write(dev->spi, dev->buf, 4);
             return;
-        }
-
-        if (dev->tx_buf_clean_mask) {
+        } else if (dev->tx_buf_clean_mask) {
             dev->tx_buf_clean_mask = false;
             dev->state = CDCTL_TX_MASK;
             cdctl_write_reg_it(dev, REG_INT_MASK, CDCTL_MASK);
