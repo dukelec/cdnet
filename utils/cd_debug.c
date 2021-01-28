@@ -65,7 +65,7 @@ void _dprintf(char* format, ...)
         local_irq_restore(flags);
         pkt = cdn_pkt_get(&sock_dbg.ns->free_pkts);
         if (pkt) {
-            memset(pkt, 0, offsetof(cdn_pkt_t, dat));
+            cdn_init_pkt(pkt);
             pkt->dat[0] = 0x40;
             pkt->len = 1;
             pkt->dst = *dbg_dst;
@@ -106,7 +106,7 @@ void _dputs(char *str)
 
     cdn_pkt_t *pkt = cdn_pkt_get(&sock_dbg.ns->free_pkts);
     if (pkt) {
-        memset(pkt, 0, offsetof(cdn_pkt_t, dat));
+        cdn_init_pkt(pkt);
         pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);

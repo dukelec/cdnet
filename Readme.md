@@ -174,7 +174,7 @@ All ports in this section are optional, but it is recommended to implement the p
 Used together with header's `SEQUENCE` for flow control and ensure data integrity.  
 The `SEQ_NUM[6:0]` auto increase when `SEQUENCE` is selected in the header.  
 Bit 7 of `SEQ_NUM` is set indicating that a report is required.  
-Do not select `SEQUENCE` for port 0 communication self.
+Do not select `SEQUENCE` for port 0 communication.
 
 Port 0 communications:
 ```
@@ -187,26 +187,30 @@ Set the SEQ_NUM:
   Return: [0x80]
 
 Report SEQ_NUM:
-  Write [0x40, SEQ_NUM]
-  No Return
+  Report [0x40, SEQ_NUM] (report to the src port of the relevant packet)
 ```
 
 Example:  
-(`->` and `<-` is port level communication, `>>` and `<<` is packet level communication)
+(The data format is cdnet payload. dft is short for default (0xcdcd). (p) marks the location of the port.)
 
 ```
-  Device A                      Device B        Description
-
-  [0x20, 0x00]          ->      Port0           Set SEQ_NUM at first time
-                        <-      [0x80]          Set return
-  [0x88, 0x00, ...]     >>                      Start send data
-  [0x88, 0x01, ...]     >>
-  [0x88, 0x82, ...]     >>                      Require report at SEQ_NUM 2
-  [0x88, 0x03, ...]     >>
-  [0x88, 0x04, ...]     >>
-  Port0                 <-      [0x40, 0x03]    Report after receive SEQ_NUM 2
-  [0x88, 0x85, ...]     >>                      Require report at SEQ_NUM 5
-  Port0                 <-      [0x40, 0x06]    Report after receive SEQ_NUM 5
+Device A                    Device B                 Description                    Port flow
+        (p)
+[0x80, 0x00, 0x20, 0x00] >>         (p)              Set SEQ_NUM at first time      (dft -> 0x0)
+                         << [0x82, 0x00, 0x80]       Port 0 reply                   (dft <- 0x0)
+              (p)
+[0x88, 0x00, 0x10, ...]  >>                          Start send data                (dft -> 0x10)
+[0x88, 0x01, 0x10, ...]  >>                                                         (dft -> 0x10)
+[0x88, 0x82, 0x10, ...]  >>                          Require report at SEQ_NUM 2    (dft -> 0x10)
+[0x88, 0x03, 0x10, ...]  >>                                                         (dft -> 0x10)
+[0x88, 0x04, 0x10, ...]  >>         (p)                                             (dft -> 0x10)
+              (p)        << [0x82, 0x00, 0x40, 0x03] Report after receive SEQ_NUM 2 (dft <- 0x0)
+[0x88, 0x85, 0x10, ...]  >>         (p)              Require report at SEQ_NUM 5    (dft -> 0x10)
+                         << [0x82, 0x00, 0x40, 0x06] Report after receive SEQ_NUM 5 (dft <- 0x0)
+              (p)
+[0x88, 0x86, 0x11, ...]  >>         (p)              Require report at SEQ_NUM 6    (dft -> 0x11)
+                         << [0x82, 0x00, 0x40, 0x07] Report after receive SEQ_NUM 6 (dft <- 0x0)
+                         << [0x82, 0x11, ...]        Reply without SEQ by default   (dft <- 0x11)
 ```
 
 
@@ -230,7 +234,6 @@ Check binary version of device information and version data:
 Example of `device_info`:  
   `M: model; S: serial string; HW: hardware version; SW: software version` ...  
 Do not care about the field order, and should at least include the model field.
-
 
 
 ## Examples

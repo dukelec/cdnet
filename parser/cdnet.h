@@ -46,9 +46,6 @@
 #ifndef CDN0_SHARE_LEFT
 #define CDN0_SHARE_LEFT 0x80
 #endif
-#ifndef CDN2_MTU
-#define CDN2_MTU        253
-#endif
 
 typedef enum {
     CDN_L0 = 0,
@@ -92,26 +89,23 @@ typedef struct {
 #define CDN_CONF_NOT_FREE   (1 << 0) // not free packet after transmit
 #define CDN_CONF_REQ_ACK    (1 << 1) // request ack
 
-#define CDN_RET_NO_FREE     1   // no free frame, pkt, or tgt
-#define CDN_RET_FMT_ERR     2
-#define CDN_RET_ROUTE_ERR   3
-#define CDN_RET_TIMEOUT     4
-#define CDN_RET_SEQ_ERR     5
-#define CDN_RET_OTHER_ERR   0x7f
+#define CDN_RET_NO_FREE     (1 << 0) // no free frame, pkt, or tgt
+#define CDN_RET_FMT_ERR     (1 << 1)
+#define CDN_RET_ROUTE_ERR   (1 << 2)
 
 typedef struct {
     list_node_t     node;
     uint8_t         _s_mac;
     uint8_t         _d_mac;
     uint8_t         _l_net; // local net
-    uint8_t         _seq;   // seq value
+    uint8_t         seq;    // seq value
 
 #ifdef CDN_L0_C             // L0 role central
     uint8_t         _l0_lp; // last_port
 #endif
 #ifdef CDN_L2
     uint8_t         l2_uf;  // user flag
-    cdn_frag_t      _l2_frag;
+    cdn_frag_t      l2_frag;
 #endif
 
     uint8_t         conf;
@@ -120,11 +114,7 @@ typedef struct {
     cdn_sockaddr_t  src;
     cdn_sockaddr_t  dst;
 
-#if CDN_MAX_DAT >= 256
-    uint32_t        len;
-#else
     uint8_t         len;
-#endif
     uint8_t         dat[CDN_MAX_DAT];
 } cdn_pkt_t;
 
@@ -148,6 +138,11 @@ static inline void cdn_set_addr(uint8_t *addr, uint8_t a0, uint8_t a1, uint8_t a
     addr[0] = a0;
     addr[1] = a1;
     addr[2] = a2;
+}
+
+static inline void cdn_init_pkt(cdn_pkt_t *pkt)
+{
+    memset(pkt, 0, offsetof(cdn_pkt_t, dat));
 }
 
 #endif

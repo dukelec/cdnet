@@ -24,11 +24,11 @@ int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 
     if (seq) {
         *payload |= CDN_HDR_L1L2_SEQ;
-        *buf++ = pkt->_seq;
+        *buf++ = pkt->seq;
     }
-    if (pkt->_l2_frag) {
+    if (pkt->l2_frag) {
         cdn_assert(seq);
-        *payload |= (pkt->_l2_frag & 0x3) << 4;
+        *payload |= (pkt->l2_frag & 0x3) << 4;
     }
 
     cdn_assert(buf - payload + pkt->len <= 253);
@@ -36,7 +36,7 @@ int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     return buf - payload + pkt->len;
 }
 
-// addition in: _seq, _l2_frag, l2_uf
+// addition in: seq, l2_frag, l2_uf
 int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->src.addr[2];
@@ -68,20 +68,20 @@ int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 
     if (*payload & 0x30) {
         cdn_assert(seq);
-        pkt->_l2_frag = (*payload >> 4) & 3;
+        pkt->l2_frag = (*payload >> 4) & 3;
     } else {
-        pkt->_l2_frag = CDN_FRAG_NONE;
+        pkt->l2_frag = CDN_FRAG_NONE;
     }
 
     if (seq)
-        pkt->_seq = *buf++;
+        pkt->seq = *buf++;
 
     pkt->len = len - (seq ? 2 : 1);
     memcpy(pkt->dat, buf, pkt->len);
     return 0;
 }
 
-// addition in: _l_net; out: _seq, _l2_frag, l2_uf
+// addition in: _l_net; out: seq, l2_frag, l2_uf
 int cdn2_from_frame(const uint8_t *frame, cdn_pkt_t *pkt)
 {
     pkt->_s_mac = frame[0];

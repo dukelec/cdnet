@@ -11,11 +11,7 @@
 #define __CDCTL_H__
 
 #include "cdbus.h"
-#ifdef CDCTL_V0X
-#include "cdctl_regs_v0x.h"
-#else // >= v10
 #include "cdctl_regs.h"
-#endif
 
 typedef struct {
     cd_dev_t    cd_dev;
