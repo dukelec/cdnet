@@ -10,24 +10,22 @@
 #include "cdnet_dispatch.h"
 
 
-cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint16_t rid, bool route, cdn_intf_t *skip, int *r_idx)
+cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint8_t net, bool route, int *r_idx)
 {
     int i;
     if (r_idx)
         *r_idx = -1;
 
     for (int i = 0; i < CDN_INTF_MAX; i++) {
-        if (!ns->intfs[i].dev)
-            break;
-        if (&ns->intfs[i] != skip && ns->intfs[i].net == rid)
+        if (ns->intfs[i].dev && ns->intfs[i].net == net)
             return &ns->intfs[i];
     }
     if (!route || !CDN_ROUTE_MAX)
         return NULL;
 
     for (i = 0; i < CDN_ROUTE_MAX; i++) {
-        if (ns->routes[i] >> 16 == rid) {
-            cdn_intf_t *intf = cdn_intf_search(ns, (ns->routes[i] >> 8) & 0xff, false, skip, NULL);
+        if (ns->routes[i] >> 16 == net) {
+            cdn_intf_t *intf = cdn_intf_search(ns, (ns->routes[i] >> 8) & 0xff, false, NULL);
             if (intf) {
                 if (r_idx)
                     *r_idx = i;
@@ -35,20 +33,28 @@ cdn_intf_t *cdn_intf_search(cdn_ns_t *ns, uint16_t rid, bool route, cdn_intf_t *
             }
         }
     }
-    if (skip)
-        return NULL;
 
     if (r_idx)
         *r_idx = 0; // index 0 for default route
-    return cdn_intf_search(ns, (ns->routes[0] >> 8) & 0xff, false, NULL, NULL);
+    return cdn_intf_search(ns, (ns->routes[0] >> 8) & 0xff, false, NULL);
 }
 
-cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, cdn_intf_t *skip)
+int cdn_mcast_search(cdn_ns_t *ns, uint16_t mid, int start)
+{
+    for (int i = start; i < CDN_ROUTE_M_MAX; i++) {
+        if (ns->routes_m[i] >> 16 == mid) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, int start_idx, int *cur_idx)
 {
     cdn_intf_t *intf;
 
     if ((pkt->dst.addr[0] & 0xf0) != 0xf0 && (pkt->dst.addr[0] & 0xf0) != 0xa0) {
-        intf = cdn_intf_search(ns, pkt->dst.addr[1], false, skip, NULL);
+        intf = cdn_intf_search(ns, pkt->dst.addr[1], false, NULL);
         if (!intf)
             return NULL;
         memcpy(pkt->src.addr, pkt->dst.addr, 3);
@@ -60,7 +66,7 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, cdn_intf_t *skip)
 
     if ((pkt->dst.addr[0] & 0xf0) == 0xa0) {
         int idx;
-        intf = cdn_intf_search(ns, pkt->dst.addr[1], true, skip, &idx);
+        intf = cdn_intf_search(ns, pkt->dst.addr[1], true, &idx);
         if (!intf)
             return NULL;
         pkt->src.addr[0] = pkt->dst.addr[0];
@@ -72,11 +78,19 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, cdn_intf_t *skip)
     }
 
     { // mcast
-        int idx;
-        intf = cdn_intf_search(ns, pkt->dst.addr[1] << 8 | pkt->dst.addr[2], true, skip, &idx);
+        int idx = cdn_mcast_search(ns, pkt->dst.addr[1] << 8 | pkt->dst.addr[2], start_idx);
+        if (cur_idx)
+            *cur_idx = idx;
+        if (idx < 0 && start_idx)
+            return NULL;
+
+        if (idx < 0)
+            intf = cdn_intf_search(ns, (ns->routes[0] >> 8) & 0xff, false, NULL);
+        else
+            intf = cdn_intf_search(ns, (ns->routes_m[idx] >> 8) & 0xff, false, NULL);
         if (!intf)
             return NULL;
-        pkt->src.addr[0] = (idx > 0 ? 0xa0 : 0x80) | (pkt->dst.addr[0] & 0x08);
+        pkt->src.addr[0] = (((idx >= 0) && (ns->routes_m[idx] & 0xff)) ? 0xa0 : 0x80) | (pkt->dst.addr[0] & 0x08);
         pkt->src.addr[1] = intf->net;
         pkt->src.addr[2] = intf->mac;
         pkt->_s_mac = intf->mac;

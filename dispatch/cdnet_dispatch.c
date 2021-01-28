@@ -221,12 +221,13 @@ void cdn_routine(cdn_ns_t *ns)
 int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
     int retf = -1, ret = 0;
-    cdn_intf_t *pre = NULL;
+    int start_idx = 0;
+    int cur_idx = 0;
 
-    while (true) { // loop for multi-intf mcast
-        cdn_intf_t *intf = cdn_route(ns, pkt, pre);
+    do {
+        cdn_intf_t *intf = cdn_route(ns, pkt, start_idx, &cur_idx);
         if (!intf) {
-            if (pre) {
+            if (start_idx) {
                 return ret;
             } else {
                 d_verbose("tx: no intf found\n");
@@ -260,8 +261,11 @@ int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
         } else {
             intf->dev->put_tx_frame(intf->dev, frame);
         }
-        pre = intf;
-    }
+        start_idx = cur_idx + 1;
+
+    } while ((pkt->dst.addr[0] & 0xf0) == 0xf0 && cur_idx >= 0); // loop for multi-intf mcast
+
+    return ret;
 }
 
 
