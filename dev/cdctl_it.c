@@ -156,7 +156,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
             last_ver = ver;
             same_cnt = 0;
         }
-        debug_flush();
+        debug_flush(false);
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
 

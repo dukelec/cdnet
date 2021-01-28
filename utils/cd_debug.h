@@ -75,7 +75,7 @@ void _dputs(char *str);
 void dhtoa(uint32_t val, char *buf);
 void debug_uart_init(void);
 void debug_init(cdn_ns_t *ns, cdn_sockaddr_t *dst, bool *en);
-void debug_flush(void);
+void debug_flush(bool wait_empty);
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);
 void hex_dump(const void *addr, int len);

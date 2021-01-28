@@ -57,7 +57,7 @@ void cdn_routine(cdn_ns_t *ns)
 
                 if (!ret) {
                     cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
-                    if (!ret && sock) {
+                    if (!ret && sock && !sock->tx_only) {
                         cdn_list_put(&sock->rx_head, &pkt->node);
                     } else {
                         d_verbose("rx: l0 no sock\n");
@@ -84,7 +84,7 @@ void cdn_routine(cdn_ns_t *ns)
                             if ((pkt->_seq & 0x7f) == tgt->rx_seq) {
                                 tgt->rx_seq = (tgt->rx_seq + 1) & 0x7f;
                                 cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
-                                if (sock) {
+                                if (sock && !sock->tx_only) {
                                     cdn_list_put(&sock->rx_head, &pkt->node);
                                 } else {
                                     d_verbose("rx: l1 no sock\n");
@@ -162,7 +162,7 @@ void cdn_routine(cdn_ns_t *ns)
 #endif // CDN_TGT
                         { // else // rx non-seq pkt
                             cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
-                            if (sock) {
+                            if (sock && !sock->tx_only) {
                                 cdn_list_put(&sock->rx_head, &pkt->node);
                             } else {
                                 d_verbose("rx: l1 no sock\n");

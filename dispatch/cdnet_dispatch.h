@@ -115,6 +115,7 @@ typedef struct {
     cdn_ns_t        *ns;
     uint16_t        port;
     list_head_t     rx_head;
+    bool            tx_only;
 } cdn_sock_t;
 
 

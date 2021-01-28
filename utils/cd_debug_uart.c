@@ -108,15 +108,19 @@ void debug_uart_init(void)
         list_put(&dbg_free, &dbg_alloc[i].node);
 }
 
-void debug_flush(void)
+void debug_flush(bool wait_empty)
 {
     static int dbg_lost_last = 0;
 
     while (true) {
 #ifdef DBG_TX_IT
         static dbg_node_t *cur_buf = NULL;
-        if (!dbg_transmit_is_ready(&debug_uart))
-            return;
+        if (wait_empty) {
+            while (!dbg_transmit_is_ready(&debug_uart));
+        } else {
+            if (!dbg_transmit_is_ready(&debug_uart))
+                return;
+        }
         if (cur_buf) {
             list_put_it(&dbg_free, &cur_buf->node);
             cur_buf = NULL;
