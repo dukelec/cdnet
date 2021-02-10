@@ -100,8 +100,7 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
     *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
 }
 
-void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
-        uint8_t filter, uint32_t baud_l, uint32_t baud_h,
+void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 #ifdef CDCTL_I2C
         i2c_t *i2c, gpio_t *rst_n)
 #else
@@ -152,10 +151,18 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head,
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
 
-    cdctl_write_reg(dev, REG_SETTING,
-            cdctl_read_reg(dev, REG_SETTING) | BIT_SETTING_TX_PUSH_PULL);
-    cdctl_write_reg(dev, REG_FILTER, filter);
-    cdctl_set_baud_rate(dev, baud_l, baud_h);
+    uint8_t setting = (cdctl_read_reg(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
+    setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
+    cdctl_write_reg(dev, REG_SETTING, setting);
+    cdctl_write_reg(dev, REG_FILTER, init->mac);
+    cdctl_write_reg(dev, REG_FILTER1, init->filter[0]);
+    cdctl_write_reg(dev, REG_FILTER2, init->filter[1]);
+    cdctl_write_reg(dev, REG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
+    cdctl_write_reg(dev, REG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
+    cdctl_write_reg(dev, REG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);
+    cdctl_write_reg(dev, REG_MAX_IDLE_LEN_H, init->max_idle_len >> 8);
+    cdctl_write_reg(dev, REG_TX_PRE_LEN, init->tx_pre_len);
+    cdctl_set_baud_rate(dev, init->baud_l, init->baud_h);
     cdctl_flush(dev);
 
     dn_debug(dev->name, "flags: %02x\n", cdctl_read_reg(dev, REG_INT_FLAG));
