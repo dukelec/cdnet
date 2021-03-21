@@ -167,7 +167,7 @@ Note:
 It is recommended that ports 0 to 0xf be used for general purpose.
 Among them, port 0 is used for sequence control of cdnet, and port 1 is used for device information query.
 
-All ports in this section are optional, but it is recommended to implement the port 1 function of the string version (device info).
+All ports in this section are optional, but it is recommended to implement the first function of port 1 (read device_info).
 
 ### Port 0
 
@@ -220,16 +220,20 @@ Provide device info.
 ```
 Type of mac_start and mac_end is uint8_t;
 Type of max_time is uint16_t, unit: ms;
-Type of "string" is any length of string, include empty.
+Type of "string" is any length of string, include empty;
+All strings excluding the terminating null byte ('\0').
 
-Check device_info string:
+Read device_info string:
   Write [0x00]
   Return [0x80, "device_info"]
 
-Check binary version of device information and version data:
-  Write [0x01]
-  Return [0x80, (User-defined binary data)]
-
+Search device by filters (used to resolve mac conflicts):
+  Write [0x10, max_time, mac_start, mac_end, "string"]
+  Return [0x80, "device_info"] after a random time in range [0, max_time]
+    only if "device_info" contain "string" (always true for empty string) and
+    current mac address is in the range [mac_start, mac_end], mac_end included
+  Not return otherwise
+    and reject any subsequent modify mac (or save config) commands
 ```
 Example of `device_info`:  
   `M: model; S: serial string; HW: hardware version; SW: software version` ...  
