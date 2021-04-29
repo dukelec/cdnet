@@ -91,6 +91,9 @@ static bool rx_match_filter(cduart_dev_t *dev,
         val = frame->dat[1];
     }
 
+    if (!filter_len)
+        return true;
+
     for (i = 0; i < filter_len; i++) {
         if (val == *(filter + i)) {
             is_match = true;
