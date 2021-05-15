@@ -14,7 +14,9 @@
 #include "cdbus.h"
 #include "cdnet.h"
 #include "cd_list.h"
+#ifdef CDN_RB_TREE
 #include "rbtree.h"
+#endif
 
 #ifndef CDN_INTF_MAX
 #define CDN_INTF_MAX            1
@@ -50,7 +52,11 @@
 struct _cdn_ns;
 
 typedef struct {
+#ifdef CDN_RB_TREE
     rb_node_t       node;
+#else
+    list_node_t     node;
+#endif
     struct _cdn_ns  *ns;        // cdn_ns_t
     uint16_t        port;
     list_head_t     rx_head;
@@ -82,7 +88,11 @@ typedef struct _cdn_ns {
 #ifdef CDN_SEQ
     cdn_tgt_t       tgts[CDN_TGT_MAX];
 #endif
+#ifdef CDN_RB_TREE
     rb_root_t       socks;
+#else
+    list_head_t     socks;
+#endif
 #ifdef CDN_L2
     list_head_t     l2_rx;
 #endif

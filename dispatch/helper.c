@@ -100,6 +100,7 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, int start_idx, int *cur_idx)
 }
 
 
+#ifdef CDN_RB_TREE
 cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port)
 {
     struct rb_root *root = &ns->socks;
@@ -140,6 +141,29 @@ int cdn_sock_insert(cdn_sock_t *sock)
     rb_insert_color(&sock->node, root);
     return 0;
 }
+#else
+
+cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port)
+{
+    list_node_t *pos;
+    list_for_each_ro(&ns->socks, pos) {
+        cdn_sock_t *sock = list_entry(pos, cdn_sock_t);
+        if (sock->port == port) {
+            return sock;
+        }
+    }
+    return NULL;
+}
+
+int cdn_sock_insert(cdn_sock_t *sock)
+{
+    if (cdn_sock_search(sock->ns, sock->port))
+        return -1;
+    list_put(&sock->ns->socks, &sock->node);
+    return 0;
+}
+#endif // CDN_RB_TREE
+
 
 #ifdef CDN_SEQ
 cdn_tgt_t *cdn_tgt_search(cdn_ns_t *ns, uint8_t net, uint8_t mac)
