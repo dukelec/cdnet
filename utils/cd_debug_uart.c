@@ -23,7 +23,7 @@ extern uart_t debug_uart;
 
 typedef struct {
     list_node_t node;
-    uint8_t data[DBG_STR_LEN];
+    uint8_t data[DBG_STR_LEN + 1];
     int len;
 } dbg_node_t;
 
@@ -62,8 +62,8 @@ void _dprintf(char* format, ...)
     va_start (arg, format);
     // WARN: stack may not enough for reentrant
     // NOTE: size include '\0', return value not include '\0'
-    int tgt_len = vsnprintf((char *)buf->data, DBG_STR_LEN + 1 - buf->len, format, arg);
-    buf->len += min(DBG_STR_LEN + buf->len, tgt_len);
+    int tgt_len = vsnprintf((char *)buf->data + buf->len, DBG_STR_LEN + 1 - buf->len, format, arg);
+    buf->len += min(DBG_STR_LEN - buf->len, tgt_len);
     va_end (arg);
 
     local_irq_save(flags);
