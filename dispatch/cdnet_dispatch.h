@@ -99,7 +99,9 @@ typedef struct _cdn_ns {
     cdn_intf_t      intfs[CDN_INTF_MAX];        //            <--. (search intf)
                                                 //               |
     uint32_t        routes[CDN_ROUTE_MAX];      // 0:remote_net:net:mac       // index 0 is default gateway
+#if CDN_ROUTE_M_MAX > 0
     uint32_t        routes_m[CDN_ROUTE_M_MAX];  //        MH:ML:net:is_remote // support multiple identical MH:ML
+#endif
 
     cdn_sock_t      sock0;                      // port0 service
 } cdn_ns_t; // name space
