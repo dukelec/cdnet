@@ -111,4 +111,27 @@
 
 #endif
 
+
+static inline uint16_t get_unaligned16(const uint8_t *p)
+{
+    return p[0] | p[1] << 8;
+}
+
+static inline uint32_t get_unaligned32(const uint8_t *p)
+{
+    return p[0] | p[1] << 8 | p[2] << 16 | p[3] << 24;
+}
+
+static inline void put_unaligned16(uint16_t val, uint8_t *p)
+{
+    *p++ = val;
+    *p++ = val >> 8;
+}
+
+static inline void put_unaligned32(uint32_t val, uint8_t *p)
+{
+    put_unaligned16(val >> 16, p + 2);
+    put_unaligned16(val, p);
+}
+
 #endif
