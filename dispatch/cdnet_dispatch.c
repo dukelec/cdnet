@@ -54,7 +54,7 @@ static void p0_service_routine(cdn_ns_t *ns)
     }
 
     d_debug("p0 ser: ignore\n");
-    list_put(&ns->free_pkts, &pkt->node);
+    list_put(ns->free_pkts, &pkt->node);
 }
 
 static int p0_report(cdn_ns_t *ns, cdn_sockaddr_t dst, uint8_t val)
@@ -67,7 +67,7 @@ static int p0_report(cdn_ns_t *ns, cdn_sockaddr_t dst, uint8_t val)
     }
 #endif
 
-    cdn_pkt_t *pkt = cdn_pkt_get(&ns->free_pkts);
+    cdn_pkt_t *pkt = cdn_pkt_get(ns->free_pkts);
     if (!pkt)
         return -1;
     cdn_init_pkt(pkt);
@@ -92,7 +92,7 @@ void cdn_routine(cdn_ns_t *ns)
         int ret;
 
         while (true) {
-            if (!ns->free_pkts.len) {
+            if (!ns->free_pkts->len) {
                 d_warn("rx: no free pkt\n");
                 break;
             }
@@ -100,7 +100,7 @@ void cdn_routine(cdn_ns_t *ns)
             frame = dev->get_rx_frame(dev);
             if (!frame)
                 break;
-            pkt = cdn_pkt_get(&ns->free_pkts);
+            pkt = cdn_pkt_get(ns->free_pkts);
             cdn_init_pkt(pkt);
             pkt->_l_net = intf->net;
 
@@ -118,11 +118,11 @@ void cdn_routine(cdn_ns_t *ns)
                         cdn_list_put(&sock->rx_head, &pkt->node);
                     } else {
                         d_verbose("rx: l0 no sock\n");
-                        cdn_list_put(&ns->free_pkts, &pkt->node);
+                        cdn_list_put(ns->free_pkts, &pkt->node);
                     }
                 } else {
                     d_verbose("rx: l0 frame err: %d\n", ret);
-                    cdn_list_put(&ns->free_pkts, &pkt->node);
+                    cdn_list_put(ns->free_pkts, &pkt->node);
                 }
 
             } else if (!(frame->dat[3] & 0x40)) { // rx l1
@@ -144,17 +144,17 @@ void cdn_routine(cdn_ns_t *ns)
                                     cdn_list_put(&sock->rx_head, &pkt->node);
                                 } else {
                                     d_verbose("rx: l1 no sock\n");
-                                    cdn_list_put(&ns->free_pkts, &pkt->node);
+                                    cdn_list_put(ns->free_pkts, &pkt->node);
                                 }
                             } else {
                                 d_verbose("rx: l1 seq: %02x != %02x\n", pkt->seq, tgt->rx_seq);
-                                cdn_list_put(&ns->free_pkts, &pkt->node);
+                                cdn_list_put(ns->free_pkts, &pkt->node);
                             }
                         } else
 #endif
                         { // else
                             d_verbose("rx: l1 no tgt\n");
-                            cdn_list_put(&ns->free_pkts, &pkt->node);
+                            cdn_list_put(ns->free_pkts, &pkt->node);
                         }
                     } else { // non-seq
                         cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
@@ -162,12 +162,12 @@ void cdn_routine(cdn_ns_t *ns)
                             cdn_list_put(&sock->rx_head, &pkt->node);
                         } else {
                             d_verbose("rx: l1 no sock\n");
-                            cdn_list_put(&ns->free_pkts, &pkt->node);
+                            cdn_list_put(ns->free_pkts, &pkt->node);
                         }
                     }
                 } else {
                     d_verbose("rx: l1 frame err: %d\n", ret);
-                    cdn_list_put(&ns->free_pkts, &pkt->node);
+                    cdn_list_put(ns->free_pkts, &pkt->node);
                 }
 
             } else { // rx l2
@@ -187,11 +187,11 @@ void cdn_routine(cdn_ns_t *ns)
                                 cdn_list_put(&ns->l2_rx, &pkt->node);
                             } else {
                                 d_verbose("rx: l2 seq: %02x != %02x\n", pkt->seq, tgt->rx_seq);
-                                cdn_list_put(&ns->free_pkts, &pkt->node);
+                                cdn_list_put(ns->free_pkts, &pkt->node);
                             }
                         } else {
                             d_verbose("rx: l2 no tgt\n");
-                            cdn_list_put(&ns->free_pkts, &pkt->node);
+                            cdn_list_put(ns->free_pkts, &pkt->node);
                         }
 
                     } else { // non-seq
@@ -199,11 +199,11 @@ void cdn_routine(cdn_ns_t *ns)
                     }
                 } else {
                     d_verbose("rx: l2 frame err: %d\n", ret);
-                    cdn_list_put(&ns->free_pkts, &pkt->node);
+                    cdn_list_put(ns->free_pkts, &pkt->node);
                 }
 #else
                 d_verbose("rx: unknown frame\n");
-                cdn_list_put(&ns->free_pkts, &pkt->node);
+                cdn_list_put(ns->free_pkts, &pkt->node);
 #endif // CDN_L2
             }
 
@@ -287,7 +287,7 @@ int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt)
 
     pkt->ret = 0x80 | ret;
     if (!(pkt->conf & CDN_CONF_NOT_FREE))
-        cdn_list_put(&ns->free_pkts, &pkt->node);
+        cdn_list_put(ns->free_pkts, &pkt->node);
     return ret;
 }
 
@@ -327,9 +327,10 @@ int cdn_add_intf(cdn_ns_t *ns, cd_dev_t *dev, uint8_t net, uint8_t mac)
     return -1;
 }
 
-void cdn_init_ns(cdn_ns_t *ns)
+void cdn_init_ns(cdn_ns_t *ns, list_head_t *free_head)
 {
     memset(ns, 0, sizeof(cdn_ns_t));
+    ns->free_pkts = free_head;
 
 #ifdef CDN_SEQ
     ns->sock0.ns = ns;
