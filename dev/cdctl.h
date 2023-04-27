@@ -16,6 +16,8 @@
 typedef struct {
     cd_dev_t    cd_dev;
     const char  *name;
+    uint8_t     version;
+    bool        _clr_flag; // need manual clr flag if version < 0x0e
 
     list_head_t *free_head;
     list_head_t rx_head;

@@ -92,10 +92,8 @@ void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    l = cdctl_read_reg(dev, REG_DIV_LS_L) |
-            cdctl_read_reg(dev, REG_DIV_LS_H) << 8;
-    h = cdctl_read_reg(dev, REG_DIV_HS_L) |
-            cdctl_read_reg(dev, REG_DIV_HS_H) << 8;
+    l = cdctl_read_reg(dev, REG_DIV_LS_L) | cdctl_read_reg(dev, REG_DIV_LS_H) << 8;
+    h = cdctl_read_reg(dev, REG_DIV_HS_L) | cdctl_read_reg(dev, REG_DIV_HS_H) << 8;
     *low = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, l + 1);
     *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
 }
@@ -150,6 +148,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         debug_flush(false);
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
+    dev->version = last_ver;
+    dev->_clr_flag = last_ver >= 0x0e ? false : true;
 
     uint8_t setting = (cdctl_read_reg(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
     setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
@@ -177,19 +177,23 @@ void cdctl_routine(cdctl_dev_t *dev)
 
     if (flags & BIT_FLAG_RX_LOST) {
         dn_error(dev->name, "BIT_FLAG_RX_LOST\n");
-        cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_LOST);
+        if (dev->_clr_flag)
+            cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_LOST);
     }
     if (flags & BIT_FLAG_RX_ERROR) {
         dn_warn(dev->name, "BIT_FLAG_RX_ERROR\n");
-        cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_ERROR);
+        if (dev->_clr_flag)
+            cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_ERROR);
     }
     if (flags & BIT_FLAG_TX_CD) {
         dn_debug(dev->name, "BIT_FLAG_TX_CD\n");
-        cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_CLR_CD);
+        if (dev->_clr_flag)
+            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_CLR_CD);
     }
     if (flags & BIT_FLAG_TX_ERROR) {
         dn_error(dev->name, "BIT_FLAG_TX_ERROR\n");
-        cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_CLR_ERROR);
+        if (dev->_clr_flag)
+            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_CLR_ERROR);
     }
 
     if (flags & BIT_FLAG_RX_PENDING) {
@@ -197,8 +201,7 @@ void cdctl_routine(cdctl_dev_t *dev)
         cd_frame_t *frame = list_get_entry(dev->free_head, cd_frame_t);
         if (frame) {
             cdctl_read_frame(dev, frame);
-            cdctl_write_reg(dev, REG_RX_CTRL,
-                    BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
+            cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
 #ifdef VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
@@ -216,15 +219,13 @@ void cdctl_routine(cdctl_dev_t *dev)
 
         flags = cdctl_read_reg(dev, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN)
-            cdctl_write_reg(dev, REG_TX_CTRL,
-                    BIT_TX_START | BIT_TX_RST_POINTER);
+            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
         else
             dev->is_pending = true;
 #ifdef VERBOSE
         char pbuf[52];
         hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-        dn_verbose(dev->name, "<- [%s]%s\n",
-                pbuf, dev->is_pending ? " (p)" : "");
+        dn_verbose(dev->name, "<- [%s]%s\n", pbuf, dev->is_pending ? " (p)" : "");
 #endif
         list_put(dev->free_head, &frame->node);
     }
@@ -233,8 +234,7 @@ void cdctl_routine(cdctl_dev_t *dev)
         flags = cdctl_read_reg(dev, REG_INT_FLAG);
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
             dn_verbose(dev->name, "trigger pending tx\n");
-            cdctl_write_reg(dev, REG_TX_CTRL,
-                    BIT_TX_START | BIT_TX_RST_POINTER);
+            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
             dev->is_pending = false;
         }
     }

@@ -33,6 +33,8 @@ typedef enum {
 typedef struct {
     cd_dev_t        cd_dev;
     const char      *name;
+    uint8_t         version;
+    bool            _clr_flag; // need manual clr flag if version < 0x0e
 
     cdctl_state_t   state;
     bool            manual_ctrl;

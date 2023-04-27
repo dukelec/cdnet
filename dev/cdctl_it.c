@@ -10,9 +10,8 @@
 #include "cdctl_it.h"
 #include "cd_debug.h"
 
-#define CDCTL_MASK (BIT_FLAG_RX_PENDING |           \
-            BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
-            BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
+#define CDCTL_MASK (BIT_FLAG_RX_PENDING | BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
+                    BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
 
 
 // used by init and user configuration
@@ -95,10 +94,8 @@ void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    l = cdctl_read_reg(dev, REG_DIV_LS_L) |
-            cdctl_read_reg(dev, REG_DIV_LS_H) << 8;
-    h = cdctl_read_reg(dev, REG_DIV_HS_L) |
-            cdctl_read_reg(dev, REG_DIV_HS_H) << 8;
+    l = cdctl_read_reg(dev, REG_DIV_LS_L) | cdctl_read_reg(dev, REG_DIV_LS_H) << 8;
+    h = cdctl_read_reg(dev, REG_DIV_HS_L) | cdctl_read_reg(dev, REG_DIV_HS_H) << 8;
     *low = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, l + 1);
     *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
 }
@@ -158,6 +155,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         debug_flush(false);
     }
     dn_info(dev->name, "version: %02x\n", last_ver);
+    dev->version = last_ver;
+    dev->_clr_flag = last_ver >= 0x0e ? false : true;
 
     uint8_t setting = (cdctl_read_reg(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
     setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
@@ -230,7 +229,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             ret |= BIT_RX_CLR_BREAK;
             dev->rx_break_cnt++;
         }
-        if (ret) {
+        if (ret && dev->_clr_flag) {
             dev->state = CDCTL_RX_CTRL;
             cdctl_write_reg_it(dev, REG_RX_CTRL, ret);
             return;
@@ -245,7 +244,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             ret |= BIT_TX_CLR_ERROR;
             dev->tx_error_cnt++;
         }
-        if (ret) {
+        if (ret && dev->_clr_flag) {
             dev->state = CDCTL_TX_CTRL;
             cdctl_write_reg_it(dev, REG_TX_CTRL, ret);
             return;
@@ -266,15 +265,13 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
                 dev->tx_wait_trigger = false;
 
                 dev->state = CDCTL_TX_CTRL;
-                cdctl_write_reg_it(dev, REG_TX_CTRL,
-                        BIT_TX_START | BIT_TX_RST_POINTER);
+                cdctl_write_reg_it(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
                 return;
             } else if (!dev->tx_buf_clean_mask) {
                 // enable tx_buf_clean irq
                 dev->tx_buf_clean_mask = true;
                 dev->state = CDCTL_TX_MASK;
-                cdctl_write_reg_it(dev, REG_INT_MASK,
-                        CDCTL_MASK | BIT_FLAG_TX_BUF_CLEAN);
+                cdctl_write_reg_it(dev, REG_INT_MASK, CDCTL_MASK | BIT_FLAG_TX_BUF_CLEAN);
                 return;
             }
         } else if (dev->tx_head.first) {
@@ -313,8 +310,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         memcpy(dev->rx_frame->dat, dev->buf + 1, 3);
         dev->state = CDCTL_RX_BODY;
         if (dev->rx_frame->dat[2] != 0) {
-            spi_dma_read(dev->spi, dev->rx_frame->dat + 3,
-                    dev->rx_frame->dat[2]);
+            spi_dma_read(dev->spi, dev->rx_frame->dat + 3, dev->rx_frame->dat[2]);
             return;
         } // no return
     }
@@ -331,8 +327,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             dev->rx_no_free_node_cnt++;
         }
         dev->state = CDCTL_RX_CTRL;
-        cdctl_write_reg_it(dev, REG_RX_CTRL,
-                BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
+        cdctl_write_reg_it(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
         return;
     }
 
