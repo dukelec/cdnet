@@ -14,41 +14,24 @@
 uint8_t cdctl_read_reg(cdctl_dev_t *dev, uint8_t reg)
 {
     uint8_t dat = 0xff;
-#ifdef CDCTL_I2C
-    i2c_mem_read(dev->i2c, reg, &dat, 1);
-#else
     spi_mem_read(dev->spi, reg, &dat, 1);
-#endif
     return dat;
 }
 
 void cdctl_write_reg(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 {
-#ifdef CDCTL_I2C
-    i2c_mem_write(dev->i2c, reg, &val, 1);
-#else
     spi_mem_write(dev->spi, reg | 0x80, &val, 1);
-#endif
 }
 
 static void cdctl_read_frame(cdctl_dev_t *dev, cd_frame_t *frame)
 {
-#ifdef CDCTL_I2C
-    i2c_mem_read(dev->i2c, REG_RX, frame->dat, 3);
-    i2c_mem_read(dev->i2c, REG_RX, frame->dat + 3, frame->dat[2]);
-#else
     spi_mem_read(dev->spi, REG_RX, frame->dat, 3);
     spi_mem_read(dev->spi, REG_RX, frame->dat + 3, frame->dat[2]);
-#endif
 }
 
 static void cdctl_write_frame(cdctl_dev_t *dev, const cd_frame_t *frame)
 {
-#ifdef CDCTL_I2C
-    i2c_mem_write(dev->i2c, REG_TX, frame->dat, frame->dat[2] + 3);
-#else
     spi_mem_write(dev->spi, REG_TX | 0x80, frame->dat, frame->dat[2] + 3);
-#endif
 }
 
 // member functions
@@ -99,11 +82,7 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 }
 
 void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-#ifdef CDCTL_I2C
-        i2c_t *i2c, gpio_t *rst_n)
-#else
         spi_t *spi, gpio_t *rst_n)
-#endif
 {
     if (!dev->name)
         dev->name = "cdctl";
@@ -119,11 +98,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->is_pending = false;
 #endif
 
-#ifdef CDCTL_I2C
-    dev->i2c = i2c;
-#else
     dev->spi = spi;
-#endif
     dev->rst_n = rst_n;
 
     dn_info(dev->name, "init...\n");
@@ -134,6 +109,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         delay_systick(2000/SYSTICK_US_DIV);
     }
 
+    // the fpga has to be read multiple times, the asic does not
     uint8_t last_ver = 0xff;
     uint8_t same_cnt = 0;
     while (true) {
@@ -151,12 +127,20 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->version = last_ver;
     dev->_clr_flag = last_ver >= 0x0e ? false : true;
 
+    if (dev->version >= 0x10) { // asic
+        cdctl_write_reg(dev, REG_CLK_CTRL, 0x80); // soft reset
+        dn_info(dev->name, "version after soft reset: %02x\n", cdctl_read_reg(dev, REG_VERSION));
+#ifndef CDCTL_AVOID_PIN_RE
+        cdctl_write_reg(dev, REG_PIN_RE_CTRL, 0x10); // enable phy rx
+#endif
+    }
+
     uint8_t setting = (cdctl_read_reg(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
     setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
     cdctl_write_reg(dev, REG_SETTING, setting);
     cdctl_write_reg(dev, REG_FILTER, init->mac);
-    cdctl_write_reg(dev, REG_FILTER1, init->filter[0]);
-    cdctl_write_reg(dev, REG_FILTER2, init->filter[1]);
+    cdctl_write_reg(dev, REG_FILTER_M1, init->filter_m[0]);
+    cdctl_write_reg(dev, REG_FILTER_M2, init->filter_m[1]);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
     cdctl_write_reg(dev, REG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);

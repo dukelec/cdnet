@@ -67,7 +67,7 @@ typedef struct {
     uint8_t         mac;
     uint32_t        baud_l;
     uint32_t        baud_h;
-    uint8_t         filter[2];
+    uint8_t         filter_m[2];
 
     uint8_t         mode; // 0: Arbitration, 1: Break Sync
     uint16_t        tx_permit_len;
@@ -79,7 +79,7 @@ typedef struct {
     .mac = _mac,                \
     .baud_l = 115200,           \
     .baud_h = 115200,           \
-    .filter = { 0xff, 0xff },   \
+    .filter_m = { 0xff, 0xff }, \
     .mode = 0,                  \
     .tx_permit_len = 0x14,      \
     .max_idle_len = 0xc8,       \

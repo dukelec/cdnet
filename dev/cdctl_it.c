@@ -141,6 +141,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         delay_systick(2000/SYSTICK_US_DIV);
     }
 
+    // the fpga has to be read multiple times, the asic does not
     uint8_t last_ver = 0xff;
     uint8_t same_cnt = 0;
     while (true) {
@@ -158,12 +159,20 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->version = last_ver;
     dev->_clr_flag = last_ver >= 0x0e ? false : true;
 
+    if (dev->version >= 0x10) { // asic
+        cdctl_write_reg(dev, REG_CLK_CTRL, 0x80); // soft reset
+        dn_info(dev->name, "version after soft reset: %02x\n", cdctl_read_reg(dev, REG_VERSION));
+#ifndef CDCTL_AVOID_PIN_RE
+        cdctl_write_reg(dev, REG_PIN_RE_CTRL, 0x10); // enable phy rx
+#endif
+    }
+
     uint8_t setting = (cdctl_read_reg(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
     setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
     cdctl_write_reg(dev, REG_SETTING, setting);
     cdctl_write_reg(dev, REG_FILTER, init->mac);
-    cdctl_write_reg(dev, REG_FILTER1, init->filter[0]);
-    cdctl_write_reg(dev, REG_FILTER2, init->filter[1]);
+    cdctl_write_reg(dev, REG_FILTER_M1, init->filter_m[0]);
+    cdctl_write_reg(dev, REG_FILTER_M2, init->filter_m[1]);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
     cdctl_write_reg(dev, REG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);

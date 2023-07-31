@@ -35,9 +35,18 @@
 #define REG_TX_CTRL         0x17
 #define REG_RX_ADDR         0x18
 #define REG_RX_PAGE_FLAG    0x19
-#define REG_FILTER1         0x1a    // multicast filter
-#define REG_FILTER2         0x1b
+#define REG_FILTER_M1       0x1a    // multicast filter
+#define REG_FILTER_M2       0x1b
 
+// CDCTL01A
+#define REG_CLK_CTRL        0x01
+#define REG_PLL_ML          0x30
+#define REG_PLL_OD_MH       0x31
+#define REG_PLL_N           0x32
+#define REG_PLL_CTRL        0x33
+#define REG_PIN_INT_CTRL    0x34
+#define REG_PIN_RE_CTRL     0x35
+#define REG_CLK_STATUS      0x36
 
 #define BIT_SETTING_TX_PUSH_PULL    (1 << 0)
 #define BIT_SETTING_TX_INVERT       (1 << 1)
