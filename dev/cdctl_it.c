@@ -171,8 +171,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
     cdctl_write_reg(dev, REG_SETTING, setting);
     cdctl_write_reg(dev, REG_FILTER, init->mac);
-    cdctl_write_reg(dev, REG_FILTER_M1, init->filter_m[0]);
-    cdctl_write_reg(dev, REG_FILTER_M2, init->filter_m[1]);
+    cdctl_write_reg(dev, REG_FILTER_M0, init->filter_m[0]);
+    cdctl_write_reg(dev, REG_FILTER_M1, init->filter_m[1]);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
     cdctl_write_reg(dev, REG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
     cdctl_write_reg(dev, REG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);
