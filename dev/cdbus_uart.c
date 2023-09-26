@@ -152,6 +152,9 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
         if (dev->rx_byte_cnt == frame->dat[2] + 5) {
             if (dev->rx_crc != 0) {
                 dn_error(dev->name, "crc error\n");
+                dev->rx_byte_cnt = 0;
+                dev->rx_crc = 0xffff;
+                return;
             } else {
                 cd_frame_t *frm = cduart_frame_get(dev->free_head);
                 if (frm) {
@@ -166,9 +169,9 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
                     // set rx_lost flag
                     dn_error(dev->name, "rx_lost\n");
                 }
+                dev->rx_byte_cnt = 0;
+                dev->rx_crc = 0xffff;
             }
-            dev->rx_byte_cnt = 0;
-            dev->rx_crc = 0xffff;
         }
     }
 }
