@@ -197,25 +197,23 @@ void cdctl_routine(cdctl_dev_t *dev)
         }
     }
 
-    if (!dev->is_pending && dev->tx_head.first) {
-        cd_frame_t *frame = list_get_entry(&dev->tx_head, cd_frame_t);
-        cdctl_write_frame(dev, frame);
+    if (!dev->is_pending) {
+        if (dev->tx_head.first) {
+            cd_frame_t *frame = list_get_entry(&dev->tx_head, cd_frame_t);
+            cdctl_write_frame(dev, frame);
 
-        flags = cdctl_read_reg(dev, REG_INT_FLAG);
-        if (flags & BIT_FLAG_TX_BUF_CLEAN)
-            cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
-        else
-            dev->is_pending = true;
+            if (flags & BIT_FLAG_TX_BUF_CLEAN)
+                cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
+            else
+                dev->is_pending = true;
 #ifdef VERBOSE
-        char pbuf[52];
-        hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
-        dn_verbose(dev->name, "<- [%s]%s\n", pbuf, dev->is_pending ? " (p)" : "");
+            char pbuf[52];
+            hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+            dn_verbose(dev->name, "<- [%s]%s\n", pbuf, dev->is_pending ? " (p)" : "");
 #endif
-        list_put(dev->free_head, &frame->node);
-    }
-
-    if (dev->is_pending) {
-        flags = cdctl_read_reg(dev, REG_INT_FLAG);
+            list_put(dev->free_head, &frame->node);
+        }
+    } else {
         if (flags & BIT_FLAG_TX_BUF_CLEAN) {
             dn_verbose(dev->name, "trigger pending tx\n");
             cdctl_write_reg(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
