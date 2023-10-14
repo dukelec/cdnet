@@ -14,7 +14,7 @@
 #include "cd_list.h"
 
 #ifndef CD_FRAME_SIZE
-#define CD_FRAME_SIZE   260 // max size for cdbus through uart
+#define CD_FRAME_SIZE   256 // without CRC
 #endif
 
 typedef struct {

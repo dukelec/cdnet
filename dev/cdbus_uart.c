@@ -10,6 +10,10 @@
 #include "cdbus_uart.h"
 #include "cd_debug.h"
 
+#if (CD_FRAME_SIZE < 258)
+#error "CD_FRAME_SIZE must be at least 258 bytes to store the CRC!"
+#endif
+
 #ifdef CDUART_IRQ_SAFE
 #define cduart_frame_get(head)  list_get_entry_it(head, cd_frame_t)
 #define cduart_list_put         list_put_it
