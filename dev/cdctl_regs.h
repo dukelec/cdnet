@@ -10,10 +10,6 @@
 #ifndef __CDCTL_REGS_H__
 #define __CDCTL_REGS_H__
 
-#ifndef CDCTL_SYS_CLK
-#define CDCTL_SYS_CLK       40000000UL // 40MHz for CDCTL-Bx
-#endif
-
 #define REG_VERSION         0x00
 #define REG_SETTING         0x02
 #define REG_IDLE_WAIT_LEN   0x04

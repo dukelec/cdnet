@@ -26,7 +26,7 @@ void cdctl_write_reg(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 static void cdctl_read_frame(cdctl_dev_t *dev, cd_frame_t *frame)
 {
     spi_mem_read(dev->spi, REG_RX, frame->dat, 3);
-    spi_mem_read(dev->spi, REG_RX, frame->dat + 3, frame->dat[2]);
+    spi_mem_read(dev->spi, REG_RX, frame->dat + 3, min(frame->dat[2], 253));
 }
 
 static void cdctl_write_frame(cdctl_dev_t *dev, const cd_frame_t *frame)

@@ -10,8 +10,10 @@
 #include "cdbus_uart.h"
 #include "cd_debug.h"
 
-#if (CD_FRAME_SIZE < 258)
+#if CD_FRAME_SIZE < 258
 #error "CD_FRAME_SIZE must be at least 258 bytes to store the CRC!"
+#elif CD_FRAME_SIZE > 260
+#error "CD_FRAME_SIZE is too large!"
 #endif
 
 #ifdef CDUART_IRQ_SAFE
@@ -112,6 +114,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
     int i;
     int max_len;
     int cpy_len;
+    int frame_len_safe;
     const uint8_t *rd = buf;
 
     while (true) {
@@ -129,10 +132,12 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
         }
         dev->t_last = get_systick();
 
-        if (dev->rx_byte_cnt < 3)
+        if (dev->rx_byte_cnt < 3) {
             cpy_len = min(3 - dev->rx_byte_cnt, max_len);
-        else
-            cpy_len = min(frame->dat[2] + 5 - dev->rx_byte_cnt, max_len);
+        } else {
+            frame_len_safe = min(frame->dat[2], CD_FRAME_SIZE - 5);
+            cpy_len = min(frame_len_safe + 5 - dev->rx_byte_cnt, max_len);
+        }
 
         memcpy(frame->dat + dev->rx_byte_cnt, rd, cpy_len);
         dev->rx_byte_cnt += cpy_len;
@@ -153,7 +158,8 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
             crc16_byte(*(rd + i), &dev->rx_crc);
         rd += cpy_len;
 
-        if (dev->rx_byte_cnt == frame->dat[2] + 5) {
+        frame_len_safe = min(frame->dat[2], CD_FRAME_SIZE - 5);
+        if (dev->rx_byte_cnt == frame_len_safe + 5) {
             if (dev->rx_crc != 0) {
                 dn_error(dev->name, "crc error\n");
                 dev->rx_byte_cnt = 0;
@@ -164,7 +170,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
                 if (frm) {
 #ifdef VERBOSE
                     char pbuf[52];
-                    hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+                    hex_dump_small(pbuf, frame->dat, frame_len_safe + 3, 16);
                     dn_verbose(dev->name, "-> [%s]\n", pbuf);
 #endif
                     cduart_list_put(&dev->rx_head, &dev->rx_frame->node);

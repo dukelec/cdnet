@@ -320,7 +320,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     if (dev->state == CDCTL_RX_HEADER) {
         dev->state = CDCTL_RX_BODY;
         if (dev->rx_frame->dat[2] != 0) {
-            spi_dma_read(dev->spi, dev->rx_frame->dat + 3, dev->rx_frame->dat[2]);
+            spi_dma_read(dev->spi, dev->rx_frame->dat + 3, min(dev->rx_frame->dat[2], 253));
             return;
         } // no return
     }
