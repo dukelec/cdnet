@@ -24,8 +24,7 @@ typedef enum {
     CDCTL_RX_BODY,
     CDCTL_RX_CTRL,
 
-    CDCTL_TX_HEADER,
-    CDCTL_TX_BODY,
+    CDCTL_TX_FRAME,
     CDCTL_TX_CTRL,
     CDCTL_TX_MASK
 } cdctl_state_t;
@@ -44,10 +43,11 @@ typedef struct {
     list_head_t     tx_head;
 
     cd_frame_t      *rx_frame;
+    cd_frame_t      *tx_frame;
     bool            tx_wait_trigger;
     bool            tx_buf_clean_mask;
 
-    uint8_t         buf[4];
+    uint8_t         buf[2];
 
     uint32_t        rx_cnt;
     uint32_t        tx_cnt;

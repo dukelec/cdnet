@@ -118,6 +118,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->manual_ctrl = false;
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
+    dev->rx_frame = NULL;
     dev->tx_wait_trigger = false;
     dev->tx_buf_clean_mask = false;
     dev->rx_cnt = 0;
@@ -262,9 +263,10 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         // check for new frame
         if (val & BIT_FLAG_RX_PENDING) {
             dev->state = CDCTL_RX_HEADER;
-            dev->buf[0] = REG_RX;
+            uint8_t *buf = dev->rx_frame->dat - 1;
+            *buf = REG_RX; // borrow space from the "node" item
             gpio_set_value(dev->spi->ns_pin, 0);
-            spi_dma_write_read(dev->spi, dev->buf, dev->buf, 4);
+            spi_dma_write_read(dev->spi, buf, buf, 4);
             return;
         }
 
@@ -284,12 +286,12 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
                 return;
             }
         } else if (dev->tx_head.first) {
-            cd_frame_t *frame = list_entry(dev->tx_head.first, cd_frame_t);
-            dev->buf[0] = REG_TX | 0x80;
-            memcpy(dev->buf + 1, frame->dat, 3);
-            dev->state = CDCTL_TX_HEADER;
+            dev->tx_frame = list_get_entry_it(&dev->tx_head, cd_frame_t);
+            uint8_t *buf = dev->tx_frame->dat - 1;
+            *buf = REG_TX | 0x80; // borrow space from the "node" item
+            dev->state = CDCTL_TX_FRAME;
             gpio_set_value(dev->spi->ns_pin, 0);
-            spi_dma_write(dev->spi, dev->buf, 4);
+            spi_dma_write(dev->spi, buf, 4 + buf[3]);
             return;
         } else if (dev->tx_buf_clean_mask) {
             dev->tx_buf_clean_mask = false;
@@ -316,7 +318,6 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
 
     // end of CDCTL_RX_HEADER
     if (dev->state == CDCTL_RX_HEADER) {
-        memcpy(dev->rx_frame->dat, dev->buf + 1, 3);
         dev->state = CDCTL_RX_BODY;
         if (dev->rx_frame->dat[2] != 0) {
             spi_dma_read(dev->spi, dev->rx_frame->dat + 3, dev->rx_frame->dat[2]);
@@ -340,21 +341,12 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         return;
     }
 
-    // end of CDCTL_TX_HEADER
-    if (dev->state == CDCTL_TX_HEADER) {
-        cd_frame_t *frame = list_entry(dev->tx_head.first, cd_frame_t);
-        dev->state = CDCTL_TX_BODY;
-        if (frame->dat[2] != 0) {
-            spi_dma_write(dev->spi, frame->dat + 3, frame->dat[2]);
-            return;
-        } // no return
-    }
-
-    // end of CDCTL_TX_BODY
-    if (dev->state == CDCTL_TX_BODY) {
+    // end of CDCTL_TX_FRAME
+    if (dev->state == CDCTL_TX_FRAME) {
         gpio_set_value(dev->spi->ns_pin, 1);
 
-        list_put_it(dev->free_head, list_get_it(&dev->tx_head));
+        list_put_it(dev->free_head, &dev->tx_frame->node);
+        dev->tx_frame = NULL;
         dev->tx_wait_trigger = true;
 
         dev->state = CDCTL_RD_FLAG;
