@@ -55,7 +55,7 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
 {
     if (!dev->name)
         dev->name = "cduart";
-    dev->rx_frame = list_get_entry(free_head, cd_frame_t);
+    dev->rx_frame = cduart_frame_get(free_head);
     dev->free_head = free_head;
     dev->cd_dev.get_free_frame = cduart_get_free_frame;
     dev->cd_dev.get_rx_frame = cduart_get_rx_frame;
