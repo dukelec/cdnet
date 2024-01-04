@@ -107,7 +107,7 @@ First byte:
 | 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, mh, ml]`         |
 
 Notes:
- - mh + ml: multicast_id, ml is mapped to mac layer multicast address;
+ - mh + ml: multicast_id, ml is mapped to mac layer multicast address (h: high byte, l: low byte);
  - Could simply use MULTI_NET = 0 and MULTICAST = 0 for local net multicast and broadcast.
 
 ### SEQUENCE
@@ -153,13 +153,12 @@ First byte:
 | 1    | 0      | More fragment             |
 | 1    | 1      | Last fragment             |
 
-Note:
- - `SEQUENCE` must be selected when using fragments.
- - There is no need to reset the `SEQ_NUM` when starting the fragmentation.
-
 ### SEQUENCE
 0: No sequence number;  
 1: Append 1 byte `SEQ_NUM`, see [Port 0](#port-0).
+
+Note:
+ - There is no need to reset the `SEQ_NUM` when starting the fragmentation.
 
 
 ## Port Allocation Recommendation

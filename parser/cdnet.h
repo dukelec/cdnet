@@ -17,7 +17,7 @@
  *  `-with seq:  c8:NN:MM
  *
  * Notes:
- *   NN: net_id, MM: mac_addr, MH+ML: multicast_id
+ *   NN: net_id, MM: mac_addr, MH+ML: multicast_id (H: high byte, L: low byte)
  */
 
 #ifndef __CDNET_H__
