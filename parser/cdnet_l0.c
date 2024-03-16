@@ -26,14 +26,11 @@ int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
 #endif
         *payload = dst->port; // hdr
     } else { // out reply
-        if (len >= 1 && (dat[0] & CDN0_SHARE_MASK) == CDN0_SHARE_LEFT) {
-            // share first byte
-            *payload = CDN_HDR_L0_REPLY | CDN_HDR_L0_SHARE | (dat[0] & ~CDN0_SHARE_MASK);
-            len--;
-            dat++;
-        } else {
-            *payload = CDN_HDR_L0_REPLY; // hdr
-        }
+        cdn_assert(len >= 1);
+        cdn_assert((dat[0] & 0xc0) == CDN0_SHARE_LEFT);
+        *payload = CDN_HDR_L0_REPLY | (dat[0] & 0x3f); // share first byte
+        len--;
+        dat++;
     }
 
     cdn_assert(len + 1 <= 253);
@@ -72,10 +69,8 @@ int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
 #ifdef CDN_L0_C
         src->port = pkt->_l0_lp;
         dst->port = CDN_DEF_PORT;
-        if (*payload & CDN_HDR_L0_SHARE) {
-            pkt->len++;
-            *dat++ = (*payload & 0x1f) | CDN0_SHARE_LEFT;
-        }
+        pkt->len++;
+        *dat++ = (*payload & 0x3f) | CDN0_SHARE_LEFT;
 #else
         cdn_assert(false); // not support
 #endif

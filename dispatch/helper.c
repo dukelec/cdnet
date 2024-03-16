@@ -55,7 +55,7 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, int start_idx, int *cur_idx)
 {
     cdn_intf_t *intf;
 
-    if ((pkt->dst.addr[0] & 0xf0) != 0xf0 && (pkt->dst.addr[0] & 0xf0) != 0xa0) {
+    if (pkt->dst.addr[0] != 0xf0 && pkt->dst.addr[0] != 0xa0) {
         intf = cdn_intf_search(ns, pkt->dst.addr[1], false, NULL);
         if (!intf)
             return NULL;
@@ -66,7 +66,7 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, int start_idx, int *cur_idx)
         return intf;
     }
 
-    if ((pkt->dst.addr[0] & 0xf0) == 0xa0) {
+    if (pkt->dst.addr[0] == 0xa0) {
         int idx;
         intf = cdn_intf_search(ns, pkt->dst.addr[1], true, &idx);
         if (!intf)
@@ -97,9 +97,9 @@ cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt, int start_idx, int *cur_idx)
         if (!intf)
             return NULL;
 #if CDN_ROUTE_M_MAX > 0
-        pkt->src.addr[0] = (((idx >= 0) && (ns->routes_m[idx] & 0xff)) ? 0xa0 : 0x80) | (pkt->dst.addr[0] & 0x08);
+        pkt->src.addr[0] = ((idx >= 0) && (ns->routes_m[idx] & 0xff)) ? 0xa0 : 0x80;
 #else
-        pkt->src.addr[0] = 0x80 | (pkt->dst.addr[0] & 0x08);
+        pkt->src.addr[0] = 0x80;
 #endif
         pkt->src.addr[1] = intf->net;
         pkt->src.addr[2] = intf->mac;
@@ -173,27 +173,3 @@ int cdn_sock_insert(cdn_sock_t *sock)
     return 0;
 }
 #endif // CDN_RB_TREE
-
-
-#ifdef CDN_SEQ
-cdn_tgt_t *cdn_tgt_search(cdn_ns_t *ns, uint8_t net, uint8_t mac)
-{
-    int i;
-    for (i = 0; i < CDN_TGT_MAX; i++) {
-        cdn_tgt_t *tgt = &ns->tgts[i];
-        if (tgt->net == net && tgt->mac == mac)
-            break;
-    }
-
-    if (i == CDN_TGT_MAX)
-        return NULL;
-
-    if (i != 0) { // move forward
-        cdn_tgt_t tmp = ns->tgts[i];
-        ns->tgts[i] = ns->tgts[i-1];
-        ns->tgts[i-1] = tmp;
-        return &ns->tgts[i-1];
-    }
-    return &ns->tgts[i];
-}
-#endif

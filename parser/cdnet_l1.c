@@ -65,9 +65,12 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     uint8_t *buf = payload + 1;
     cdn_multi_t multi = CDN_MULTI_NONE;
 
-    multi |= (src->addr[0] & 0xf0) == 0xa0 ? CDN_MULTI_NET : CDN_MULTI_NONE;
-    multi |= (dst->addr[0] & 0xf0) == 0xf0 ? CDN_MULTI_CAST : CDN_MULTI_NONE;
-    *payload = CDN_HDR_L1L2 | (multi << 4); // hdr
+    if (src->addr[0] == 0xa0)
+        multi |= CDN_MULTI_NET;
+    if (dst->addr[0] == 0xf0)
+        multi |= CDN_MULTI_CAST;
+
+    *payload = 0x80 | (multi << 4); // hdr
 
     if (multi & CDN_MULTI_NET) {
         *buf++ = src->addr[1];
@@ -76,10 +79,6 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     if (multi != CDN_MULTI_NONE) {
         *buf++ = dst->addr[1];
         *buf++ = dst->addr[2];
-    }
-    if (dst->addr[0] & 8) {
-        *payload |= CDN_HDR_L1L2_SEQ;
-        *buf++ = pkt->seq;
     }
 
     *payload |= cal_port_val(src->port, dst->port, &s_port_size, &d_port_size);
@@ -97,7 +96,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     return buf - payload + pkt->len;
 }
 
-// addition in: seq, _s_mac, _d_mac
+// addition in: _s_mac, _d_mac
 int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
 {
     frame[0] = pkt->_s_mac;
@@ -117,31 +116,27 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
     cdn_sockaddr_t *dst = &pkt->dst;
 
     const uint8_t *buf = payload + 1;
-    cdn_assert((*payload & 0xc0) == 0x80);
-
-    bool seq = !!(*payload & CDN_HDR_L1L2_SEQ);
+    cdn_assert((*payload & 0xc8) == 0x80);
     cdn_multi_t multi = (*payload >> 4) & 3;
 
     if (multi & CDN_MULTI_NET) {
-        src->addr[0] = seq ? 0xa8 : 0xa0;
+        src->addr[0] = 0xa0;
         src->addr[1] = *buf++;
         src->addr[2] = *buf++;
     } else {
-        src->addr[0] = seq ? 0x88 : 0x80;
+        src->addr[0] = 0x80;
         src->addr[1] = pkt->_l_net;
         src->addr[2] = pkt->_s_mac;
     }
     if (multi != CDN_MULTI_NONE) {
-        dst->addr[0] = ((multi & CDN_MULTI_CAST) ? 0xf0 : 0xa0) | (seq ? 8 : 0);
+        dst->addr[0] = (multi & CDN_MULTI_CAST) ? 0xf0 : 0xa0;
         dst->addr[1] = *buf++;
         dst->addr[2] = *buf++;
     } else {
-        dst->addr[0] = seq ? 0x88 : 0x80;
+        dst->addr[0] = 0x80;
         dst->addr[1] = pkt->_l_net;
         dst->addr[2] = pkt->_d_mac;
     }
-    if (seq)
-        pkt->seq = *buf++;
 
     get_port_size(*payload & 0x07, &s_port_size, &d_port_size);
     if (s_port_size == 0) {
@@ -166,7 +161,7 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
     return 0;
 }
 
-// addition in: _l_net; out: seq
+// addition in: _l_net
 int cdn1_from_frame(const uint8_t *frame, cdn_pkt_t *pkt)
 {
     pkt->_s_mac = frame[0];

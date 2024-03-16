@@ -27,18 +27,9 @@
 #define CDN_DEF_PORT    0xcdcd
 #endif
 
-#ifndef CDN0_SHARE_MASK
-#define CDN0_SHARE_MASK 0xe0
-#endif
 #ifndef CDN0_SHARE_LEFT
 #define CDN0_SHARE_LEFT 0x80
 #endif
-
-typedef enum {
-    CDN_L0 = 0,
-    CDN_L1,
-    CDN_L2
-} cdn_level_t;
 
 typedef enum {
     CDN_MULTI_NONE = 0,
@@ -47,20 +38,7 @@ typedef enum {
     CDN_MULTI_CAST_NET
 } cdn_multi_t;
 
-typedef enum {
-    CDN_FRAG_NONE = 0,
-    CDN_FRAG_FIRST,
-    CDN_FRAG_MORE,
-    CDN_FRAG_LAST
-} cdn_frag_t;
-
-#define CDN_HDR_L1L2        (1 << 7)
-#define CDN_HDR_L2          (1 << 6)
-
 #define CDN_HDR_L0_REPLY    (1 << 6)
-#define CDN_HDR_L0_SHARE    (1 << 5)
-
-#define CDN_HDR_L1L2_SEQ    (1 << 3)
 
 
 typedef struct {
@@ -74,9 +52,8 @@ typedef struct {
 #endif
 
 #define CDN_CONF_NOT_FREE   (1 << 0) // not free packet after transmit
-#define CDN_CONF_REQ_ACK    (1 << 1) // request ack
 
-#define CDN_RET_NO_FREE     (1 << 0) // no free frame, pkt, or tgt
+#define CDN_RET_NO_FREE     (1 << 0) // no free frame or pkt
 #define CDN_RET_FMT_ERR     (1 << 1)
 #define CDN_RET_ROUTE_ERR   (1 << 2)
 
@@ -85,14 +62,9 @@ typedef struct {
     uint8_t         _s_mac;
     uint8_t         _d_mac;
     uint8_t         _l_net; // local net
-    uint8_t         seq;    // seq value
 
 #ifdef CDN_L0_C             // L0 role central
     uint8_t         _l0_lp; // last_port
-#endif
-#ifdef CDN_L2
-    uint8_t         l2_uf;  // user flag
-    cdn_frag_t      l2_frag;
 #endif
 
     uint8_t         conf;
@@ -110,15 +82,11 @@ int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
 int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
 int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
 int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
-int cdn2_to_payload(const cdn_pkt_t *pkt, uint8_t *payload);
-int cdn2_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt);
 
 int cdn0_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
 int cdn0_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
 int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
 int cdn1_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
-int cdn2_to_frame(const cdn_pkt_t *pkt, uint8_t *frame);
-int cdn2_from_frame(const uint8_t *frame, cdn_pkt_t *pkt);
 
 static inline void cdn_set_addr(uint8_t *addr, uint8_t a0, uint8_t a1, uint8_t a2)
 {
