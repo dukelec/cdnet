@@ -10,7 +10,8 @@
 #include <unistd.h>
 #include <time.h>
 
-#include "common.h"
+#include "cd_utils.h"
+#include "cd_list.h"
 #include "arch_wrapper.h"
 
 
