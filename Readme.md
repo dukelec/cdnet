@@ -1,8 +1,11 @@
 CDNET: An Optional High-Layer Protocol for CDBUS
 =======================================
 
+Protocol status: Stable [Version 1.0]
+
 The CDBUS frame containing a CDNET package is as follows:  
-`[src, dst, len] + [CDNET package] + [crc_l, crc_h]`
+`[src, dst, len] + [CDNET package] + [crc_l, crc_h]`  
+`[src, dst, len] + [CDNET header, payload] + [crc_l, crc_h]`
 
 
 ## CDNET Levels
@@ -53,11 +56,10 @@ The first byte of the header:
 | FIELD   | DESCRIPTION                     |
 |-------- |---------------------------------|
 | [7]     | Always 1                        |
-| [6]     | _Reserved as 0_                 |
 | [5]     | MULTI_NET                       |
 | [4]     | MULTICAST                       |
-| [3]     | _Reserved as 0_                 |
-| [2:0]   | PORT_SIZE                       |
+| [2:1]   | PORT_SIZE                       |
+| [6][3][0] | _Reserved as 0_               |
 
 ### MULTI_NET & MULTICAST
 
@@ -71,23 +73,21 @@ The first byte of the header:
 Notes:
  - mh + ml: multicast_id, ml is mapped to mac layer multicast address (h: high byte, l: low byte);
  - Could simply use MULTI_NET = 0 and MULTICAST = 0 for local net multicast and broadcast.
+ - Implementations of MULTI_NET and MULTICAST are optional.
 
 ### PORT_SIZE:
 
-| Bit2 | Bit1 | Bit0   | SRC_PORT      | DST_PORT      |
-|------|------|--------|---------------|---------------|
-| 0    | 0    | 0      | Default port  | 1 byte        |
-| 0    | 0    | 1      | Default port  | 2 bytes       |
-| 0    | 1    | 0      | 1 byte        | Default port  |
-| 0    | 1    | 1      | 2 bytes       | Default port  |
-| 1    | 0    | 0      | 1 byte        | 1 byte        |
-| 1    | 0    | 1      | 1 byte        | 2 bytes       |
-| 1    | 1    | 0      | 2 bytes       | 1 byte        |
-| 1    | 1    | 1      | 2 bytes       | 2 bytes       |
+| Bit2 | Bit1 | SRC_PORT      | DST_PORT      |
+|------|------|---------------|---------------|
+| 0    | 0    | Default port  | 1-byte        |
+| 0    | 1    | 1-byte        | Default port  |
+| 1    | 0    | 1-byte        | 1-byte        |
+| 1    | 1    | 2-byte        | 2-byte        |
 
 Notes:
  - The default port is `0xcdcd` for convention and doesn't consume space.
  - Append bytes for `src_port` before `dst_port`.
+ - Implementation of 2-byte port is optional.
 
 
 
@@ -98,7 +98,7 @@ For Request and Report, the first byte definition:
 | FIELD   | DESCRIPTION                         |
 |-------- |-------------------------------------|
 | [7]     | is_reply, always 0                  |
-| [6]     | no_reply                            |
+| [6]     | not_reply                           |
 | [5:0]   | sub command                         |
 
 For Reply, the first byte definition:
@@ -142,7 +142,7 @@ Search devices by filters (for resolving mac conflicts):
 ```
 Example of `device_info`:  
   `M: model; S: serial id; HW: hardware version; SW: software version` ...  
-Field order is not essential, but the model field should be included at a minimum.
+Field order is not important; it is recommended to include the model field at least.
 
 
 
@@ -200,7 +200,7 @@ For transferring large data, such as transmitting a jpg image in the `cdcam` pro
 Here, the `cnt` value corresponds to 0 for the first packet, and increments by 1 for each subsequent packet.
 
 If flow control is required, for example, we can group every 12 packets as a transmission set,
-where only the last packet in each set has `no_reply` set to 0. Start by transmitting 2 sets of packets,
+where only the last packet in each set has `not_reply` set to 0. Start by transmitting 2 sets of packets,
 wait for a reply regarding the last packet in the first set, and then append another set of packets.
 
 For sub commands that do not have a `cnt` definition like the one mentioned above,

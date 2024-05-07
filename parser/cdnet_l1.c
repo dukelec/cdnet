@@ -10,24 +10,17 @@
 #include "cdnet.h"
 
 
-static int get_port_size(uint8_t val, uint8_t *src_size, uint8_t *dst_size)
+static void get_port_size(uint8_t val, uint8_t *src_size, uint8_t *dst_size)
 {
     switch (val) {
     case 0x00: *src_size = 0; *dst_size = 1; break;
-    case 0x01: *src_size = 0; *dst_size = 2; break;
     case 0x02: *src_size = 1; *dst_size = 0; break;
-    case 0x03: *src_size = 2; *dst_size = 0; break;
     case 0x04: *src_size = 1; *dst_size = 1; break;
-    case 0x05: *src_size = 1; *dst_size = 2; break;
-    case 0x06: *src_size = 2; *dst_size = 1; break;
-    case 0x07: *src_size = 2; *dst_size = 2; break;
-    default: return -1;
+    default:   *src_size = 2; *dst_size = 2;
     }
-    return 0;
 }
 
-static int cal_port_val(uint16_t src, uint16_t dst,
-        uint8_t *src_size, uint8_t *dst_size)
+static int cal_port_val(uint16_t src, uint16_t dst, uint8_t *src_size, uint8_t *dst_size)
 {
     if (src == CDN_DEF_PORT)
         *src_size = 0;
@@ -45,14 +38,9 @@ static int cal_port_val(uint16_t src, uint16_t dst,
 
     switch ((*src_size << 4) | *dst_size) {
     case 0x01: return 0x00;
-    case 0x02: return 0x01;
     case 0x10: return 0x02;
-    case 0x20: return 0x03;
     case 0x11: return 0x04;
-    case 0x12: return 0x05;
-    case 0x21: return 0x06;
-    case 0x22: return 0x07;
-    default: return -1;
+    default:   return 0x06;
     }
 }
 
@@ -138,7 +126,7 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
         dst->addr[2] = pkt->_d_mac;
     }
 
-    get_port_size(*payload & 0x07, &s_port_size, &d_port_size);
+    get_port_size(*payload & 0x06, &s_port_size, &d_port_size);
     if (s_port_size == 0) {
         src->port = CDN_DEF_PORT;
     } else {
