@@ -11,7 +11,7 @@
 
 #include "cd_utils.h"
 #include "cd_list.h"
-#include "cdnet_dispatch.h"
+#include "cdnet_core.h"
 
 extern uart_t debug_uart;
 

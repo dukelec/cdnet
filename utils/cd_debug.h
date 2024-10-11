@@ -10,7 +10,7 @@
 #ifndef __CD_DEBUG_H__
 #define __CD_DEBUG_H__
 
-#include "cdnet_dispatch.h"
+#include "cdnet_core.h"
 
 #ifndef d_printf
 #define d_printf(fmt, ...)          _dprintf(fmt, ## __VA_ARGS__)

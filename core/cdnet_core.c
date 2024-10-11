@@ -7,8 +7,41 @@
  * Author: Duke Fong <d@d-l.io>
  */
 
-#include "cdnet_dispatch.h"
+#include "cdnet_core.h"
 #include "cd_debug.h"
+
+
+// simplified for basic use, override for full processing
+__weak cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt)
+{
+    cdn_intf_t *intf = &ns->intfs[0];
+    pkt->src.addr[0] = pkt->dst.addr[0] != 0xf0 ? pkt->dst.addr[0] : 0x80; // or 0xa0
+    pkt->src.addr[1] = intf->net;
+    pkt->src.addr[2] = intf->mac;
+    pkt->_s_mac = intf->mac;
+    pkt->_d_mac = pkt->dst.addr[2]; // or default route for unique local
+    return intf;
+}
+
+static cdn_sock_t *cdn_sock_search(cdn_ns_t *ns, uint16_t port)
+{
+    list_node_t *pos;
+    list_for_each_ro(&ns->socks, pos) {
+        cdn_sock_t *sock = list_entry(pos, cdn_sock_t);
+        if (sock->port == port) {
+            return sock;
+        }
+    }
+    return NULL;
+}
+
+static int cdn_sock_insert(cdn_sock_t *sock)
+{
+    if (cdn_sock_search(sock->ns, sock->port))
+        return -1;
+    list_put(&sock->ns->socks, &sock->node);
+    return 0;
+}
 
 
 void cdn_routine(cdn_ns_t *ns)
@@ -72,7 +105,6 @@ void cdn_routine(cdn_ns_t *ns)
                     d_verbose("rx: l1 frame err: %d\n", ret);
                     cdn_list_put(ns->free_pkts, &pkt->node);
                 }
-
             }
 
             dev->put_free_frame(dev, frame);
@@ -83,46 +115,34 @@ void cdn_routine(cdn_ns_t *ns)
 
 int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
-    int retf = -1, ret = 0;
-    int start_idx = 0;
-    int cur_idx = 0;
+    int ret;
+    cdn_intf_t *intf = cdn_route(ns, pkt);
+    if (!intf) {
+        d_verbose("tx: no intf found\n");
+        return CDN_RET_ROUTE_ERR;
+    }
 
-    do {
-        cdn_intf_t *intf = cdn_route(ns, pkt, start_idx, &cur_idx);
-        if (!intf) {
-            if (start_idx) {
-                return ret;
-            } else {
-                d_verbose("tx: no intf found\n");
-                return ret | CDN_RET_ROUTE_ERR;
-            }
-        }
+    cd_frame_t *frame = intf->dev->get_free_frame(intf->dev);
+    if (!frame)
+        return CDN_RET_NO_FREE;
 
-        cd_frame_t *frame = intf->dev->get_free_frame(intf->dev);
-        if (!frame)
-            return ret | CDN_RET_NO_FREE;
-
-        if (pkt->src.addr[0] == 0) {
+    if (pkt->src.addr[0] == 0) {
 #ifdef CDN_L0_C
-            if (pkt->src.port == CDN_DEF_PORT)
-                intf->_l0_lp = pkt->dst.port;
+        if (pkt->src.port == CDN_DEF_PORT)
+            intf->_l0_lp = pkt->dst.port;
 #endif
-            retf = cdn0_to_frame(pkt, frame->dat);
-        } else {
-            retf = cdn1_to_frame(pkt, frame->dat);
-        }
+        ret = cdn0_to_frame(pkt, frame->dat);
+    } else {
+        ret = cdn1_to_frame(pkt, frame->dat);
+    }
 
-        if (retf) {
-            intf->dev->put_free_frame(intf->dev, frame);
-            ret |= CDN_RET_FMT_ERR;
-        } else {
-            intf->dev->put_tx_frame(intf->dev, frame);
-        }
-        start_idx = cur_idx + 1;
-
-    } while (pkt->dst.addr[0] == 0xf0 && cur_idx >= 0); // loop for multi-intf mcast
-
-    return ret;
+    if (ret) {
+        intf->dev->put_free_frame(intf->dev, frame);
+        return CDN_RET_FMT_ERR;
+    } else {
+        intf->dev->put_tx_frame(intf->dev, frame);
+    }
+    return 0;
 }
 
 
