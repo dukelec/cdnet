@@ -149,9 +149,10 @@ Field order is not important; it is recommended to include the model field at le
 ## CDNET Address String Formats
 
 ```
-             local link     unique local    multicast
-level0:       00:NN:MM
-level1:       80:NN:MM        a0:NN:MM       f0:MH:ML
+           localhost      local link     unique local    multicast
+            10:00:00
+level0:                    00:NN:MM
+level1:                    80:NN:MM        a0:NN:MM       f0:MH:ML
 ```
 
 Notes:

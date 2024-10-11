@@ -128,8 +128,19 @@ int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
 
 int cdn_send_pkt(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
-    int ret = cdn_send_frame(ns, pkt);
+    if (pkt->dst.addr[0] == 0x10) { // localhost
+        cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
+        if (sock && !sock->tx_only) {
+            memcpy(pkt->src.addr, pkt->dst.addr, 3);
+            cdn_list_put(&sock->rx_head, &pkt->node);
+        } else {
+            d_verbose("tx: localhost no sock\n");
+            cdn_list_put(ns->free_pkts, &pkt->node);
+        }
+        return 0;
+    }
 
+    int ret = cdn_send_frame(ns, pkt);
     pkt->ret = 0x80 | ret;
     if (!(pkt->conf & CDN_CONF_NOT_FREE))
         cdn_list_put(ns->free_pkts, &pkt->node);
