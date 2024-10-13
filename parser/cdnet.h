@@ -48,7 +48,7 @@ typedef struct {
 
 
 #ifndef CDN_MAX_DAT
-#define CDN_MAX_DAT         252
+#define CDN_MAX_DAT         252      // allow smaller sizes to save memory
 #endif
 
 #define CDN_CONF_NOT_FREE   (1 << 0) // not free packet after transmit

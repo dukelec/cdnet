@@ -38,7 +38,7 @@ typedef struct cduart_dev {
 
 
 void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head);
-void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len);
+void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len);
 
 static inline void cduart_fill_crc(uint8_t *dat)
 {

@@ -307,9 +307,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     }
 
     // end of CDCTL_RX_CTRL, TX_CTRL, TX_MASK
-    if (dev->state == CDCTL_RX_CTRL ||
-            dev->state == CDCTL_TX_CTRL ||
-            dev->state == CDCTL_TX_MASK) {
+    if (dev->state == CDCTL_RX_CTRL || dev->state == CDCTL_TX_CTRL || dev->state == CDCTL_TX_MASK) {
         gpio_set_value(dev->spi->ns_pin, 1);
         dev->state = CDCTL_RD_FLAG;
         cdctl_read_reg_it(dev, REG_INT_FLAG);
@@ -319,8 +317,14 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     // end of CDCTL_RX_HEADER
     if (dev->state == CDCTL_RX_HEADER) {
         dev->state = CDCTL_RX_BODY;
+        if (dev->rx_frame->dat[2] > min(CD_FRAME_SIZE - 3, 253)) {
+            dev->rx_len_err_cnt++;
+            dev->state = CDCTL_RX_CTRL;
+            cdctl_write_reg_it(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
+            return;
+        }
         if (dev->rx_frame->dat[2] != 0) {
-            spi_dma_read(dev->spi, dev->rx_frame->dat + 3, min(dev->rx_frame->dat[2], 253));
+            spi_dma_read(dev->spi, dev->rx_frame->dat + 3, dev->rx_frame->dat[2]);
             return;
         } // no return
     }

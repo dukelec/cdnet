@@ -10,12 +10,6 @@
 #include "cdbus_uart.h"
 #include "cd_debug.h"
 
-#if CD_FRAME_SIZE < 258
-#error "CD_FRAME_SIZE must be at least 258 bytes to store the CRC!"
-#elif CD_FRAME_SIZE > 260
-#error "CD_FRAME_SIZE is too large!"
-#endif
-
 #ifdef CDUART_IRQ_SAFE
 #define cduart_frame_get(head)  list_get_entry_it(head, cd_frame_t)
 #define cduart_list_put         list_put_it
@@ -78,8 +72,7 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
 
 // handler
 
-static bool rx_match_filter(cduart_dev_t *dev,
-        cd_frame_t *frame, bool test_remote)
+static bool rx_match_filter(cduart_dev_t *dev, cd_frame_t *frame, bool test_remote)
 {
     uint8_t i;
     uint8_t *filter;
@@ -109,12 +102,11 @@ static bool rx_match_filter(cduart_dev_t *dev,
     return is_match;
 }
 
-void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
+void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
 {
-    int i;
-    int max_len;
-    int cpy_len;
-    int frame_len_safe;
+    unsigned max_len;
+    unsigned cpy_len;
+    unsigned frame_len_safe = 0;
     const uint8_t *rd = buf;
 
     while (true) {
@@ -124,8 +116,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
             return;
         max_len = buf + len - rd;
 
-        if (dev->rx_byte_cnt != 0 &&
-                get_systick() - dev->t_last > CDUART_IDLE_TIME) {
+        if (dev->rx_byte_cnt != 0 && get_systick() - dev->t_last > CDUART_IDLE_TIME) {
             dn_warn(dev->name, "drop timeout, cnt: %d\n", dev->rx_byte_cnt);
             dev->rx_byte_cnt = 0;
             dev->rx_crc = 0xffff;
@@ -142,23 +133,21 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, int len)
         memcpy(frame->dat + dev->rx_byte_cnt, rd, cpy_len);
         dev->rx_byte_cnt += cpy_len;
 
-        if (dev->rx_byte_cnt <= 3 &&
-                ((dev->rx_byte_cnt >= 2 &&
-                        !rx_match_filter(dev, frame, false)) ||
-                        (dev->rx_byte_cnt >= 1 &&
-                                !rx_match_filter(dev, frame, true)))) {
-            dn_warn(dev->name, "filtered, len: %d, [%02x, %02x ...]\n",
-                    dev->rx_byte_cnt, frame->dat[0], frame->dat[1]);
+        if (dev->rx_byte_cnt == 3 &&
+                    (frame->dat[2] > CD_FRAME_SIZE - 5 ||
+                     !rx_match_filter(dev, frame, false) ||
+                     !rx_match_filter(dev, frame, true))) {
+            dn_warn(dev->name, "filtered, hdr: %02x %02x %02x\n",
+                    frame->dat[0], frame->dat[1], frame->dat[2]);
             dev->rx_byte_cnt = 0;
             dev->rx_crc = 0xffff;
             return;
         }
 
-        for (i = 0; i < cpy_len; i++)
+        for (int i = 0; i < cpy_len; i++)
             crc16_byte(*(rd + i), &dev->rx_crc);
         rd += cpy_len;
 
-        frame_len_safe = min(frame->dat[2], CD_FRAME_SIZE - 5);
         if (dev->rx_byte_cnt == frame_len_safe + 5) {
             if (dev->rx_crc != 0) {
                 dn_error(dev->name, "crc error\n");

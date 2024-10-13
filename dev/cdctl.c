@@ -23,10 +23,13 @@ void cdctl_write_reg(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
     spi_mem_write(dev->spi, reg | 0x80, &val, 1);
 }
 
-static void cdctl_read_frame(cdctl_dev_t *dev, cd_frame_t *frame)
+static int cdctl_read_frame(cdctl_dev_t *dev, cd_frame_t *frame)
 {
     spi_mem_read(dev->spi, REG_RX, frame->dat, 3);
-    spi_mem_read(dev->spi, REG_RX, frame->dat + 3, min(frame->dat[2], 253));
+    if (frame->dat[2] > min(CD_FRAME_SIZE - 3, 253))
+        return -1;
+    spi_mem_read(dev->spi, REG_RX, frame->dat + 3, frame->dat[2]);
+    return 0;
 }
 
 static void cdctl_write_frame(cdctl_dev_t *dev, const cd_frame_t *frame)
@@ -184,16 +187,21 @@ void cdctl_routine(cdctl_dev_t *dev)
         // if get free list: copy to rx list
         cd_frame_t *frame = list_get_entry(dev->free_head, cd_frame_t);
         if (frame) {
-            cdctl_read_frame(dev, frame);
+            int ret = cdctl_read_frame(dev, frame);
             cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
 #ifdef VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
             dn_verbose(dev->name, "-> [%s]\n", pbuf);
 #endif
-            list_put(&dev->rx_head, &frame->node);
+            if (ret) {
+                dn_error(dev->name, "rx frame len err\n");
+                list_put(dev->free_head, &frame->node);
+            } else {
+                list_put(&dev->rx_head, &frame->node);
+            }
         } else {
-            dn_error(dev->name, "get_rx, no free frame\n");
+            dn_error(dev->name, "get rx, no free frame\n");
         }
     }
 

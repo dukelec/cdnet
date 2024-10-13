@@ -7,6 +7,7 @@
  * Author: Duke Fong <d@d-l.io>
  */
 
+#include "cdbus.h"
 #include "cdnet.h"
 
 
@@ -33,7 +34,7 @@ int cdn0_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
         dat++;
     }
 
-    cdn_assert(len + 1 <= 253);
+    cdn_assert(len + 1 <= min(253, CD_FRAME_SIZE - 3));
     memcpy(payload + 1, dat, len);
     return len + 1;
 }
@@ -79,6 +80,8 @@ int cdn0_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
         dst->port = *payload;
     }
 
+    if (len - 1 > CDN_MAX_DAT)
+        return -1;
     memcpy(dat, payload + 1, len - 1);
     return 0;
 }

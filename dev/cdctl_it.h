@@ -57,6 +57,7 @@ typedef struct {
     uint32_t        tx_cd_cnt;
     uint32_t        tx_error_cnt;
     uint32_t        rx_no_free_node_cnt;
+    uint32_t        rx_len_err_cnt;
 
     spi_t           *spi;
     gpio_t          *rst_n;
