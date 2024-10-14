@@ -28,6 +28,7 @@ typedef struct cduart_dev {
     cd_frame_t          *rx_frame;  // init: != NULL
     uint16_t            rx_byte_cnt;
     uint16_t            rx_crc;
+    bool                rx_drop;
     uint32_t            t_last;     // last receive time
 
     uint8_t             local_filter[8];

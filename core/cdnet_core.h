@@ -10,10 +10,8 @@
 #ifndef __CDNET_CORE_H__
 #define __CDNET_CORE_H__
 
-#include "cd_utils.h"
 #include "cdbus.h"
 #include "cdnet.h"
-#include "cd_list.h"
 
 #ifndef CDN_INTF_MAX
 #define CDN_INTF_MAX            1

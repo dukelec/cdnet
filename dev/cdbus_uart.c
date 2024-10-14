@@ -63,6 +63,7 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
     dev->rx_byte_cnt = 0;
+    dev->rx_drop = false;
 
     // filters should set by caller
     dev->remote_filter_len = 0;
@@ -106,7 +107,6 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
 {
     unsigned max_len;
     unsigned cpy_len;
-    unsigned frame_len_safe = 0;
     const uint8_t *rd = buf;
 
     while (true) {
@@ -117,60 +117,62 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
         max_len = buf + len - rd;
 
         if (dev->rx_byte_cnt != 0 && get_systick() - dev->t_last > CDUART_IDLE_TIME) {
-            dn_warn(dev->name, "drop timeout, cnt: %d\n", dev->rx_byte_cnt);
+            dn_warn(dev->name, "drop timeout, cnt: %d, hdr: %02x %02x %02x\n",
+                    dev->rx_byte_cnt, frame->dat[0], frame->dat[1], frame->dat[2]);
             dev->rx_byte_cnt = 0;
             dev->rx_crc = 0xffff;
+            dev->rx_drop = false;
         }
         dev->t_last = get_systick();
 
-        if (dev->rx_byte_cnt < 3) {
+        if (dev->rx_byte_cnt < 3)
             cpy_len = min(3 - dev->rx_byte_cnt, max_len);
-        } else {
-            frame_len_safe = min(frame->dat[2], CD_FRAME_SIZE - 5);
-            cpy_len = min(frame_len_safe + 5 - dev->rx_byte_cnt, max_len);
-        }
+        else
+            cpy_len = min(frame->dat[2] + 5 - dev->rx_byte_cnt, max_len);
 
-        memcpy(frame->dat + dev->rx_byte_cnt, rd, cpy_len);
+        if (!dev->rx_drop)
+            memcpy(frame->dat + dev->rx_byte_cnt, rd, cpy_len);
         dev->rx_byte_cnt += cpy_len;
 
         if (dev->rx_byte_cnt == 3 &&
                     (frame->dat[2] > CD_FRAME_SIZE - 5 ||
                      !rx_match_filter(dev, frame, false) ||
                      !rx_match_filter(dev, frame, true))) {
-            dn_warn(dev->name, "filtered, hdr: %02x %02x %02x\n",
+            dn_warn(dev->name, "drop, hdr: %02x %02x %02x\n",
                     frame->dat[0], frame->dat[1], frame->dat[2]);
-            dev->rx_byte_cnt = 0;
-            dev->rx_crc = 0xffff;
-            return;
+            dev->rx_drop = true;
         }
 
-        for (int i = 0; i < cpy_len; i++)
-            crc16_byte(*(rd + i), &dev->rx_crc);
+        if (!dev->rx_drop)
+            for (int i = 0; i < cpy_len; i++)
+                crc16_byte(*(rd + i), &dev->rx_crc);
         rd += cpy_len;
 
-        if (dev->rx_byte_cnt == frame_len_safe + 5) {
-            if (dev->rx_crc != 0) {
-                dn_error(dev->name, "crc error\n");
-                dev->rx_byte_cnt = 0;
-                dev->rx_crc = 0xffff;
-                return;
-            } else {
-                cd_frame_t *frm = cduart_frame_get(dev->free_head);
-                if (frm) {
-#ifdef VERBOSE
-                    char pbuf[52];
-                    hex_dump_small(pbuf, frame->dat, frame_len_safe + 3, 16);
-                    dn_verbose(dev->name, "-> [%s]\n", pbuf);
-#endif
-                    cduart_list_put(&dev->rx_head, &dev->rx_frame->node);
-                    dev->rx_frame = frm;
+        if (dev->rx_byte_cnt == frame->dat[2] + 5) {
+            if (!dev->rx_drop) {
+                if (dev->rx_crc != 0) {
+                    dn_error(dev->name, "crc error, hdr: %02x %02x %02x\n",
+                            frame->dat[0], frame->dat[1], frame->dat[2]);
+
                 } else {
-                    // set rx_lost flag
-                    dn_error(dev->name, "rx_lost\n");
+                    cd_frame_t *frm = cduart_frame_get(dev->free_head);
+                    if (frm) {
+#ifdef VERBOSE
+                        char pbuf[52];
+                        hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
+                        dn_verbose(dev->name, "-> [%s]\n", pbuf);
+#endif
+                        cduart_list_put(&dev->rx_head, &dev->rx_frame->node);
+                        dev->rx_frame = frm;
+                    } else {
+                        // set rx_lost flag
+                        dn_error(dev->name, "rx_lost\n");
+                    }
                 }
-                dev->rx_byte_cnt = 0;
-                dev->rx_crc = 0xffff;
             }
+            dev->rx_byte_cnt = 0;
+            dev->rx_crc = 0xffff;
+            dev->rx_drop = false;
         }
     }
 }

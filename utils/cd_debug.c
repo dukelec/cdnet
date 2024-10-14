@@ -9,8 +9,6 @@
  *                          how-do-i-use-the-printf-function-on-stm32
  */
 
-#include "cd_utils.h"
-#include "cd_list.h"
 #include "cdnet_core.h"
 
 extern uart_t debug_uart;
