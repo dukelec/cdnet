@@ -13,16 +13,14 @@
 
 #include "cd_utils.h"
 
-extern const uint16_t crc16_table[];
+void crc16_sub(const uint8_t *data, uint32_t length, uint16_t *crc_val);
 
-static inline void crc16_byte(uint8_t data, uint16_t *crc_val)
+static inline uint16_t crc16(const uint8_t *data, uint32_t length)
 {
-    uint8_t tmp;
-    tmp = data ^ *crc_val;
-    *crc_val >>= 8;
-    *crc_val ^= crc16_table[tmp];
+   uint16_t crc_val = 0xFFFF;
+   crc16_sub(data, length, &crc_val);
+   return crc_val;
 }
-uint16_t crc16(const uint8_t *data, uint32_t length);
 
 #endif
 
