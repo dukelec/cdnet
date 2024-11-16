@@ -144,7 +144,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
         }
 
         if (!dev->rx_drop)
-            crc16_sub(rd, cpy_len, &dev->rx_crc);
+            dev->rx_crc = crc16_sub(rd, cpy_len, dev->rx_crc);
         rd += cpy_len;
 
         if (dev->rx_byte_cnt == frame->dat[2] + 5) {

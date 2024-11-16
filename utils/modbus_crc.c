@@ -45,11 +45,13 @@ const uint16_t crc16_table[] = {
     0X8201, 0X42C0, 0X4380, 0X8341, 0X4100, 0X81C1, 0X8081, 0X4040 };
 
 
-void crc16_sub(const uint8_t *data, uint32_t length, uint16_t *crc_val)
+uint16_t crc16_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
 {
     while (length--) {
-        uint8_t tmp = *data++ ^ *crc_val;
-        *crc_val >>= 8;
-        *crc_val ^= crc16_table[tmp];
+        uint8_t tmp = *data++ ^ crc_val;
+        crc_val >>= 8;
+        crc_val ^= crc16_table[tmp];
     }
+    return crc_val;
 }
+
