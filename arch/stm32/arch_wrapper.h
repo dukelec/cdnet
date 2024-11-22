@@ -157,4 +157,3 @@ static inline void delay_systick(uint32_t val)
 }
 
 #endif
-

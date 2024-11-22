@@ -211,4 +211,3 @@ we can also achieve this by cyclically sending commands through multiple source 
 This way, if a command does not receive a reply, resend the command.
 The receiving port checks whether the source port number of the received command matches that of the previous command;
 if they match, the command is not executed again.
-

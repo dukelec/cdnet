@@ -11,7 +11,6 @@
 #define __CD_UTILS_H__
 
 #include <errno.h>
-#include <sys/unistd.h> // STDOUT_FILENO, STDERR_FILENO
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>

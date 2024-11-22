@@ -166,10 +166,6 @@ void debug_flush(bool wait_empty)
 
 int _write(int file, char *data, int len)
 {
-   if (file != STDOUT_FILENO && file != STDERR_FILENO) {
-      errno = EBADF;
-      return -1;
-   }
    dbg_transmit(&debug_uart, (uint8_t *)data, len);
    return len;
 }

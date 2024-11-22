@@ -54,4 +54,3 @@ uint16_t crc16_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
     }
     return crc_val;
 }
-

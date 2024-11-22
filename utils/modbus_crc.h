@@ -21,4 +21,3 @@ static inline uint16_t crc16(const uint8_t *data, uint32_t length)
 }
 
 #endif
-
