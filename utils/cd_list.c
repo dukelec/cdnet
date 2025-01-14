@@ -133,12 +133,12 @@ static void list_check(list_head_t *head)
     }
 
     if (head->len != len) {
-        printf("PANIC: list %p, wrong len: %d, %d\n", head, head->len, len);
+        printf("PANIC: list %p, wrong len: %ld, %d\n", head, head->len, len);
         _Unwind_Backtrace(&trace_fcn, NULL);
         while (true);
     }
     if (head->last != pre) {
-        printf("PANIC: list %p, wrong head->last: %p, %p, len: %d, %d\n",
+        printf("PANIC: list %p, wrong head->last: %p, %p, len: %ld, %d\n",
                 head, head->last, node, head->len, len);
         _Unwind_Backtrace(&trace_fcn, NULL);
         while (true);

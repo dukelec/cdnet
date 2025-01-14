@@ -25,10 +25,16 @@ typedef struct {
     uint8_t     dat[CD_FRAME_SIZE];
 } cd_frame_t;
 
+#ifdef CD_IRQ_SAFE
+#define cd_list_get(head)               list_get_entry_it(head, cd_frame_t)
+#define cd_list_put(head, frm)          list_put_it(head, &(frm)->node)
+#elif !defined(CD_USER_LIST)
+#define cd_list_get(head)               list_get_entry(head, cd_frame_t)
+#define cd_list_put(head, frm)          list_put(head, &(frm)->node)
+#endif
+
 typedef struct cd_dev {
-    cd_frame_t *(* get_free_frame)(struct cd_dev *cd_dev);
     cd_frame_t *(* get_rx_frame)(struct cd_dev *cd_dev);
-    void (* put_free_frame)(struct cd_dev *cd_dev, cd_frame_t *frame);
     void (* put_tx_frame)(struct cd_dev *cd_dev, cd_frame_t *frame);
 } cd_dev_t;
 

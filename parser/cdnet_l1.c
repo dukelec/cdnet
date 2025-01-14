@@ -46,12 +46,12 @@ static int cal_port_val(uint16_t src, uint16_t dst, uint8_t *src_size, uint8_t *
 }
 
 
-int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
+int cdn1_hdr_w(const cdn_pkt_t *pkt, uint8_t *hdr)
 {
     uint8_t s_port_size, d_port_size;
     const cdn_sockaddr_t *src = &pkt->src;
     const cdn_sockaddr_t *dst = &pkt->dst;
-    uint8_t *buf = payload + 1;
+    uint8_t *buf = hdr + 1;
     cdn_multi_t multi = CDN_MULTI_NONE;
 
     if (src->addr[0] == 0xa0)
@@ -59,7 +59,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     if (dst->addr[0] == 0xf0)
         multi |= CDN_MULTI_CAST;
 
-    *payload = 0x80 | (multi << 4); // hdr
+    *hdr = 0x80 | (multi << 4); // hdr
 
     if (multi & CDN_MULTI_NET) {
         *buf++ = src->addr[1];
@@ -70,7 +70,7 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
         *buf++ = dst->addr[2];
     }
 
-    *payload |= cal_port_val(src->port, dst->port, &s_port_size, &d_port_size);
+    *hdr |= cal_port_val(src->port, dst->port, &s_port_size, &d_port_size);
     if (s_port_size >= 1)
         *buf++ = src->port & 0xff;
     if (s_port_size == 2)
@@ -80,33 +80,32 @@ int cdn1_to_payload(const cdn_pkt_t *pkt, uint8_t *payload)
     if (d_port_size == 2)
         *buf++ = dst->port >> 8;
 
-    cdn_assert(buf - payload + pkt->len <= min(253, CD_FRAME_SIZE - 3));
-    memcpy(buf, pkt->dat, pkt->len);
-    return buf - payload + pkt->len;
+    return buf - hdr;
 }
 
 // addition in: _s_mac, _d_mac
-int cdn1_to_frame(const cdn_pkt_t *pkt, uint8_t *frame)
+int cdn1_frame_w(cdn_pkt_t *pkt)
 {
+    uint8_t *frame = pkt->frm->dat;
     frame[0] = pkt->_s_mac;
     frame[1] = pkt->_d_mac;
-    int ret = cdn1_to_payload(pkt, frame + 3);
-    if (ret < 0)
-        return ret;
-    frame[2] = ret;
+    int len = cdn1_hdr_w(pkt, frame + 3);
+    if (len < 0)
+        return len;
+    frame[2] = pkt->len + len;
     return 0;
 }
 
 
-int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
+int cdn1_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
 {
     uint8_t s_port_size, d_port_size;
     cdn_sockaddr_t *src = &pkt->src;
     cdn_sockaddr_t *dst = &pkt->dst;
 
-    const uint8_t *buf = payload + 1;
-    cdn_assert((*payload & 0xc8) == 0x80);
-    cdn_multi_t multi = (*payload >> 4) & 3;
+    const uint8_t *buf = hdr + 1;
+    cdn_assert((*hdr & 0xc8) == 0x80);
+    cdn_multi_t multi = (*hdr >> 4) & 3;
 
     if (multi & CDN_MULTI_NET) {
         src->addr[0] = 0xa0;
@@ -127,7 +126,7 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
         dst->addr[2] = pkt->_d_mac;
     }
 
-    get_port_size(*payload & 0x06, &s_port_size, &d_port_size);
+    get_port_size(*hdr & 0x06, &s_port_size, &d_port_size);
     if (s_port_size == 0) {
         src->port = CDN_DEF_PORT;
     } else {
@@ -144,18 +143,19 @@ int cdn1_from_payload(const uint8_t *payload, uint8_t len, cdn_pkt_t *pkt)
         if (d_port_size == 2)
             dst->port |= *buf++ << 8;
     }
-
-    pkt->len = len - (buf - payload);
-    if (pkt->len > CDN_MAX_DAT)
-        return -1;
-    memcpy(pkt->dat, buf, pkt->len);
-    return 0;
+    return buf - hdr;
 }
 
 // addition in: _l_net
-int cdn1_from_frame(const uint8_t *frame, cdn_pkt_t *pkt)
+int cdn1_frame_r(cdn_pkt_t *pkt)
 {
+    uint8_t *frame = pkt->frm->dat;
     pkt->_s_mac = frame[0];
     pkt->_d_mac = frame[1];
-    return cdn1_from_payload(frame + 3, frame[2], pkt);
+    int len = cdn1_hdr_r(pkt, frame + 3);
+    if (len < 0)
+        return len;
+    pkt->dat = frame + 3 + len;
+    pkt->len = frame[2] - len;
+    return 0;
 }

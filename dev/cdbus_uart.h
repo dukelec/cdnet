@@ -16,6 +16,12 @@
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
+#ifndef CDUART_CRC
+#define CDUART_CRC          crc16
+#endif
+#ifndef CDUART_CRC_SUB
+#define CDUART_CRC_SUB      crc16_sub
+#endif
 
 typedef struct cduart_dev {
     cd_dev_t            cd_dev;
@@ -31,10 +37,7 @@ typedef struct cduart_dev {
     bool                rx_drop;
     uint32_t            t_last;     // last receive time
 
-    uint8_t             local_filter[8];
-    uint8_t             remote_filter[8];
-    uint8_t             local_filter_len;
-    uint8_t             remote_filter_len;
+    uint8_t             local_mac;
 } cduart_dev_t;
 
 
@@ -43,7 +46,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len);
 
 static inline void cduart_fill_crc(uint8_t *dat)
 {
-    uint16_t crc_val = crc16(dat, dat[2] + 3);
+    uint16_t crc_val = CDUART_CRC(dat, dat[2] + 3);
     dat[dat[2] + 3] = crc_val & 0xff;
     dat[dat[2] + 4] = crc_val >> 8;
 }

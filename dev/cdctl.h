@@ -56,19 +56,17 @@ typedef struct {
 void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         spi_t *spi, gpio_t *rst_n);
 
-uint8_t cdctl_read_reg(cdctl_dev_t *dev, uint8_t reg);
-void cdctl_write_reg(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
+uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
+void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high);
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high);
 
-cd_frame_t *cdctl_get_free_frame(cd_dev_t *cd_dev);
 cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev);
-void cdctl_put_free_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 
 static inline void cdctl_flush(cdctl_dev_t *dev)
 {
-    cdctl_write_reg(dev, REG_RX_CTRL, BIT_RX_RST_ALL);
+    cdctl_reg_w(dev, REG_RX_CTRL, BIT_RX_RST_ALL);
 }
 
 void cdctl_routine(cdctl_dev_t *dev);
