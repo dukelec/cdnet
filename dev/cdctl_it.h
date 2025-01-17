@@ -33,7 +33,6 @@ typedef struct {
     bool            _clr_flag; // need manual clr flag if version < 0x0e
 
     cdctl_state_t   state;
-    bool            manual_ctrl;
 
     list_head_t     *free_head;
     list_head_t     rx_head;
@@ -59,6 +58,7 @@ typedef struct {
     spi_t           *spi;
     gpio_t          *rst_n;
     gpio_t          *int_n;
+    irq_t           int_irq;
 } cdctl_dev_t;
 
 typedef struct {
@@ -85,7 +85,7 @@ typedef struct {
 }
 
 void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *rst_n, gpio_t *int_n);
+        spi_t *spi, gpio_t *rst_n, gpio_t *int_n, irq_t int_irq);
 
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);

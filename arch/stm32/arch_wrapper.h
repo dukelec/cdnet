@@ -43,6 +43,19 @@ static inline void local_irq_disable(void)
 }
 
 
+#define irq_t   IRQn_Type
+
+static inline void irq_enable(irq_t irq)
+{
+    NVIC_EnableIRQ(irq);
+}
+
+static inline void irq_disable(irq_t irq)
+{
+    NVIC_DisableIRQ(irq);
+}
+
+
 // gpio wrapper
 
 typedef struct {

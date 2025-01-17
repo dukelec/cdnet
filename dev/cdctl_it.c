@@ -18,31 +18,19 @@
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg)
 {
     uint8_t dat = 0xff;
-    dev->manual_ctrl = true;
-    while (dev->state > CDCTL_IDLE);
+    irq_disable(dev->int_irq);
+    while (dev->state > CDCTL_WAIT_TX_CLEAN);
     spi_mem_read(dev->spi, reg, &dat, 1);
-    dev->manual_ctrl = false;
-    if (!gpio_get_val(dev->int_n)) {
-        uint32_t flags;
-        local_irq_save(flags);
-        cdctl_int_isr(dev);
-        local_irq_restore(flags);
-    }
+    irq_enable(dev->int_irq);
     return dat;
 }
 
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 {
-    dev->manual_ctrl = true;
-    while (dev->state > CDCTL_IDLE);
+    irq_disable(dev->int_irq);
+    while (dev->state > CDCTL_WAIT_TX_CLEAN);
     spi_mem_write(dev->spi, reg | 0x80, &val, 1);
-    dev->manual_ctrl = false;
-    if (!gpio_get_val(dev->int_n)) {
-        uint32_t flags;
-        local_irq_save(flags);
-        cdctl_int_isr(dev);
-        local_irq_restore(flags);
-    }
+    irq_enable(dev->int_irq);
 }
 
 
@@ -56,14 +44,14 @@ cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev)
 
 void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
-    uint32_t flags;
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
-    local_irq_save(flags);
+
     dev->tx_cnt++;
-    list_put(&dev->tx_head, &frame->node);
+    list_put_it(&dev->tx_head, &frame->node);
+    irq_disable(dev->int_irq);
     if (dev->state == CDCTL_IDLE)
         cdctl_int_isr(dev);
-    local_irq_restore(flags);
+    irq_enable(dev->int_irq);
 }
 
 
@@ -90,7 +78,7 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 
 
 void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *rst_n, gpio_t *int_n)
+        spi_t *spi, gpio_t *rst_n, gpio_t *int_n, irq_t int_irq)
 {
     if (!dev->name)
         dev->name = "cdctl";
@@ -101,7 +89,6 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 
 #ifdef USE_DYNAMIC_INIT
     dev->state = CDCTL_RST;
-    dev->manual_ctrl = false;
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
     dev->rx_frame = NULL;
@@ -119,6 +106,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->spi = spi;
     dev->rst_n = rst_n;
     dev->int_n = int_n;
+    dev->int_irq = int_irq;
 
     dn_info(dev->name, "init...\n");
     if (rst_n) {
@@ -169,8 +157,8 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     cdctl_flush(dev);
 
     dn_debug(dev->name, "flags: %02x\n", cdctl_reg_r(dev, REG_INT_FLAG));
-    cdctl_reg_w(dev, REG_INT_MASK, CDCTL_MASK);
     dev->state = CDCTL_IDLE;
+    cdctl_reg_w(dev, REG_INT_MASK, CDCTL_MASK);
 }
 
 
@@ -194,7 +182,7 @@ static inline void cdctl_reg_w_it(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 // int_n pin interrupt isr
 void cdctl_int_isr(cdctl_dev_t *dev)
 {
-    if ((!dev->manual_ctrl && dev->state == CDCTL_IDLE) || dev->state == CDCTL_WAIT_TX_CLEAN) {
+    if (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN) {
         dev->state = CDCTL_RD_FLAG;
         cdctl_reg_r_it(dev, REG_INT_FLAG);
     }

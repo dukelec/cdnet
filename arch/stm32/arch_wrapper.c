@@ -85,7 +85,7 @@ void spi_wr_init(spi_t *dev)
 uint16_t crc16_hw_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
 {
     uint16_t ret_val;
-#ifdef CRC_HW_IRQ_SAFE
+#ifdef CRC_HW_IRQ_SAFE // not recommended, avoid large critical sections
     uint32_t flags;
     local_irq_save(flags);
 #endif
