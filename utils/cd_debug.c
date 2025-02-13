@@ -80,7 +80,7 @@ void _dprintf(char* format, ...)
 
     local_irq_save(flags);
     if (pkt->dat[pkt->len - 1] == '\n' || pkt->len == DBG_STR_LEN + 1 || pkt_cont) {
-        list_put(&dbg_pend, &pkt->node);
+        cdn_list_put(&dbg_pend, pkt);
     } else {
         pkt_cont = pkt;
     }
@@ -107,7 +107,7 @@ void _dputs(char *str)
         pkt->dat[0] = 0x40;
         pkt->len = strlen(str) + 1;
         memcpy(pkt->dat + 1, str, pkt->len - 1);
-        list_put_it(&dbg_pend, &pkt->node);
+        cdn_list_put(&dbg_pend, pkt);
     }
 }
 

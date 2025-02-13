@@ -39,7 +39,7 @@ void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
-    return list_get_entry_it(&dev->rx_head, cd_frame_t);
+    return cd_list_get(&dev->rx_head);
 }
 
 void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
@@ -47,7 +47,7 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
 
     dev->tx_cnt++;
-    list_put_it(&dev->tx_head, &frame->node);
+    cd_list_put(&dev->tx_head, frame);
     irq_disable(dev->int_irq);
     if (dev->state == CDCTL_IDLE)
         cdctl_int_isr(dev);
@@ -82,7 +82,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 {
     if (!dev->name)
         dev->name = "cdctl";
-    dev->rx_frame = list_get_entry_it(free_head, cd_frame_t);
+    dev->rx_frame = cd_list_get(free_head);
     dev->free_head = free_head;
     dev->cd_dev.get_rx_frame = cdctl_get_rx_frame;
     dev->cd_dev.put_tx_frame = cdctl_put_tx_frame;
@@ -261,7 +261,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
                 return;
             }
         } else if (dev->tx_head.first) {
-            dev->tx_frame = list_get_entry_it(&dev->tx_head, cd_frame_t);
+            dev->tx_frame = cd_list_get(&dev->tx_head);
             uint8_t *buf = dev->tx_frame->dat - 1;
             *buf = REG_TX | 0x80; // borrow space from the "node" item
             dev->state = CDCTL_TX_FRAME;
@@ -307,9 +307,9 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     // end of CDCTL_RX_BODY
     if (dev->state == CDCTL_RX_BODY) {
         gpio_set_high(dev->spi->ns_pin);
-        cd_frame_t *frame = list_get_entry_it(dev->free_head, cd_frame_t);
+        cd_frame_t *frame = cd_list_get(dev->free_head);
         if (frame) {
-            list_put_it(&dev->rx_head, &dev->rx_frame->node);
+            cd_list_put(&dev->rx_head, dev->rx_frame);
             dev->rx_frame = frame;
             dev->rx_cnt++;
         } else {
@@ -324,7 +324,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     if (dev->state == CDCTL_TX_FRAME) {
         gpio_set_high(dev->spi->ns_pin);
 
-        list_put_it(dev->free_head, &dev->tx_frame->node);
+        cd_list_put(dev->free_head, dev->tx_frame);
         dev->tx_frame = NULL;
         dev->tx_wait_trigger = true;
 
