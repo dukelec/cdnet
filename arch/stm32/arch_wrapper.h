@@ -208,4 +208,6 @@ static inline void delay_systick(uint32_t val)
     HAL_Delay(val);
 }
 
+void delay_us(uint32_t us);
+
 #endif

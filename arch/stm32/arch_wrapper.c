@@ -117,3 +117,21 @@ uint16_t crc16_hw_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
 
 #endif
 
+
+void delay_us(uint32_t us)
+{
+    uint32_t cnt_1ms = SysTick->LOAD + 1;
+    uint32_t last = SysTick->VAL;
+    uint32_t total = 0;
+    uint32_t target = cnt_1ms / 1000 * us;
+
+    while (total < target) {
+        uint32_t cur = SysTick->VAL;
+        int32_t diff = last - cur;
+        if (diff < 0)
+            diff += cnt_1ms;
+        total += diff;
+        last = cur;
+    }
+}
+
