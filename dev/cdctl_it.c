@@ -9,6 +9,7 @@
 
 #include "cdctl_it.h"
 #include "cd_debug.h"
+#include "cdctl_pll_cal.h"
 
 #define CDCTL_MASK (BIT_FLAG_RX_PENDING | BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
                     BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
@@ -58,8 +59,8 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    l = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, low) - 1;
-    h = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, high) - 1;
+    l = DIV_ROUND_CLOSEST(dev->sysclk, low) - 1;
+    h = DIV_ROUND_CLOSEST(dev->sysclk, high) - 1;
     cdctl_reg_w(dev, REG_DIV_LS_L, l & 0xff);
     cdctl_reg_w(dev, REG_DIV_LS_H, l >> 8);
     cdctl_reg_w(dev, REG_DIV_HS_L, h & 0xff);
@@ -72,8 +73,8 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
     uint16_t l, h;
     l = cdctl_reg_r(dev, REG_DIV_LS_L) | cdctl_reg_r(dev, REG_DIV_LS_H) << 8;
     h = cdctl_reg_r(dev, REG_DIV_HS_L) | cdctl_reg_r(dev, REG_DIV_HS_H) << 8;
-    *low = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, l + 1);
-    *high = DIV_ROUND_CLOSEST(CDCTL_SYS_CLK, h + 1);
+    *low = DIV_ROUND_CLOSEST(dev->sysclk, l + 1);
+    *high = DIV_ROUND_CLOSEST(dev->sysclk, h + 1);
 }
 
 
@@ -140,6 +141,25 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 #ifndef CDCTL_AVOID_PIN_RE
         cdctl_reg_w(dev, REG_PIN_RE_CTRL, 0x10); // enable phy rx
 #endif
+        dev->sysclk = cdctl_sys_cal(init->baud_h);
+        pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
+        uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
+        d_info("cdctl: sysclk %ld, actual: %d\n", dev->sysclk, actual_freq);
+        dev->sysclk = actual_freq;
+        cdctl_reg_w(dev, REG_PLL_N, pll.n);
+        cdctl_reg_w(dev, REG_PLL_ML, pll.m & 0xff);
+        cdctl_reg_w(dev, REG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));
+        d_info("pll_n: %02x, ml: %02x, od_mh: %02x\n",
+                cdctl_reg_r(dev, REG_PLL_N), cdctl_reg_r(dev, REG_PLL_ML), cdctl_reg_r(dev, REG_PLL_OD_MH));
+        d_info("pll_ctrl: %02x\n", cdctl_reg_r(dev, REG_PLL_CTRL));
+        cdctl_reg_w(dev, REG_PLL_CTRL, 0x10); // enable pll
+        d_info("clk_status: %02x\n", cdctl_reg_r(dev, REG_CLK_STATUS));
+        cdctl_reg_w(dev, REG_CLK_CTRL, 0x01); // select pll
+        d_info("clk_status after select pll: %02x\n", cdctl_reg_r(dev, REG_CLK_STATUS));
+        d_info("version after select pll: %02x\n", cdctl_reg_r(dev, REG_VERSION));
+    } else {
+        dev->sysclk = 40e6L;
+        d_info("fallback to cdctl-b1 module, ver: %02x\n", dev->version);
     }
 
     uint8_t setting = (cdctl_reg_r(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
@@ -156,6 +176,10 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     cdctl_set_baud_rate(dev, init->baud_l, init->baud_h);
     cdctl_flush(dev);
 
+    cdctl_get_baud_rate(dev, &init->baud_l, &init->baud_h);
+    d_debug("cdctl: get baud rate: %lu %lu\n", init->baud_l, init->baud_h);
+    d_debug("cdctl: get filter(m): %02x (%02x %02x)\n",
+            cdctl_reg_r(dev, REG_FILTER), cdctl_reg_r(dev, REG_FILTER_M0), cdctl_reg_r(dev, REG_FILTER_M1));
     dn_debug(dev->name, "flags: %02x\n", cdctl_reg_r(dev, REG_INT_FLAG));
     dev->state = CDCTL_IDLE;
     cdctl_reg_w(dev, REG_INT_MASK, CDCTL_MASK);
@@ -177,7 +201,6 @@ static inline void cdctl_reg_w_it(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
     spi_wr_it(dev->spi, dev->buf, NULL, 2);
 }
 
-// handlers
 
 // int_n pin interrupt isr
 void cdctl_int_isr(cdctl_dev_t *dev)
