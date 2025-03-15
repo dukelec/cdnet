@@ -47,7 +47,7 @@ void _dprintf(char* format, ...)
 
     local_irq_save(flags);
 
-    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT || sock_dbg.ns->free_frm->len < DBG_MIN_PKT) {
         dbg_lost_cnt++;
         local_irq_restore(flags);
         return;
@@ -92,7 +92,7 @@ void _dputs(char *str)
     if (!dbg_en || !*dbg_en)
         return;
 
-    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT || sock_dbg.ns->free_frm->len < DBG_MIN_PKT) {
         uint32_t flags;
         local_irq_save(flags);
         dbg_lost_cnt++;
