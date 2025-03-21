@@ -34,12 +34,12 @@ pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output) {
                     break;
 
                 uint32_t computed_output = DIV_ROUND_CLOSEST(vco_freq, factor_d);
-                uint32_t error = abs(computed_output - output);
+                uint32_t error = abs((int32_t)(computed_output - output));
 
                 // optimize div_freq and vco_freq
-                uint32_t div_freq_deviation = abs(div_freq - target_div_freq);
-                uint32_t vco_freq_deviation = abs(vco_freq - target_vco);
-                uint32_t total_deviation = div_freq_deviation + vco_freq_deviation;
+                uint32_t div_freq_deviation = abs((int32_t)(div_freq - target_div_freq));
+                uint32_t vco_freq_deviation = abs((int32_t)(vco_freq - target_vco));
+                uint32_t total_deviation = div_freq_deviation * 10 + vco_freq_deviation;
 
                 if (error < best.error || (error == best.error && total_deviation < best.deviation)) {
                     best.n = n;
@@ -76,7 +76,7 @@ uint32_t cdctl_sys_cal(uint32_t baud) {
 
     for (uint32_t c = clk_max; c >= clk_min; c -= clk_step) {
         uint32_t div = DIV_ROUND_CLOSEST(c, baud);
-        uint32_t error = abs(DIV_ROUND_CLOSEST(c, div) - baud);
+        uint32_t error = abs((int32_t)(DIV_ROUND_CLOSEST(c, div) - baud));
 
         if (error < best[1]) {
             best[0] = c;
