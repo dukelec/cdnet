@@ -173,7 +173,7 @@ void cdctl_routine(cdctl_dev_t *dev)
         if (frame) {
             int ret = cdctl_read_frame(dev, frame);
             cdctl_reg_w(dev, CDREG_RX_CTRL, CDBIT_RX_CLR_PENDING | CDBIT_RX_RST_POINTER);
-#ifdef VERBOSE
+#ifdef CD_VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
             dn_verbose(dev->name, "-> [%s]\n", pbuf);
@@ -202,7 +202,7 @@ void cdctl_routine(cdctl_dev_t *dev)
                 cdctl_reg_w(dev, CDREG_TX_CTRL, CDBIT_TX_START | CDBIT_TX_RST_POINTER);
             else
                 dev->is_pending = true;
-#ifdef VERBOSE
+#ifdef CD_VERBOSE
             char pbuf[52];
             hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
             dn_verbose(dev->name, "<- [%s]%s\n", pbuf, dev->is_pending ? " (p)" : "");

@@ -39,15 +39,15 @@
 #define dnf_warn(name, fmt, ...)    d_warn("%s: %s: " fmt, name, __FUNCTION__, ## __VA_ARGS__)
 #define dnf_error(name, fmt, ...)   d_error("%s: %s: " fmt, name, __FUNCTION__, ## __VA_ARGS__)
 
-#ifdef VERBOSE
+#ifdef CD_VERBOSE
 #define d_verbose_c(fmt, ...)       d_printf(fmt, ## __VA_ARGS__)
 #define d_verbose(fmt, ...)         d_printf("V: " fmt, ## __VA_ARGS__)
 #define dn_verbose(name, fmt, ...)  d_verbose("%s: " fmt, name, ## __VA_ARGS__)
 #define df_verbose(fmt, ...)        dn_verbose(__FUNCTION__, fmt, ## __VA_ARGS__)
 #define dnf_verbose(name, fmt, ...) d_verbose("%s: %s: " fmt, name, __FUNCTION__, ## __VA_ARGS__)
-#ifndef DEBUG
-#define DEBUG
-#endif // DEBUG
+#ifndef CD_DEBUG
+#define CD_DEBUG
+#endif // CD_DEBUG
 #else
 #define d_verbose_c(fmt, ...)       do {} while (0)
 #define d_verbose(fmt, ...)         do {} while (0)
@@ -56,7 +56,7 @@
 #define dnf_verbose(name, ...)      do {} while (0)
 #endif
 
-#ifdef DEBUG
+#ifdef CD_DEBUG
 #define d_debug_c(fmt, ...)         d_printf(fmt, ## __VA_ARGS__)
 #define d_debug(fmt, ...)           d_printf("D: " fmt, ## __VA_ARGS__)
 #define dn_debug(name, fmt, ...)    d_debug("%s: " fmt, name, ## __VA_ARGS__)

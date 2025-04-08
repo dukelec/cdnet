@@ -95,7 +95,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
                 } else {
                     cd_frame_t *frm = cd_list_get(dev->free_head);
                     if (frm) {
-#ifdef VERBOSE
+#ifdef CD_VERBOSE
                         char pbuf[52];
                         hex_dump_small(pbuf, frame->dat, frame->dat[2] + 3, 16);
                         dn_verbose(dev->name, "-> [%s]\n", pbuf);

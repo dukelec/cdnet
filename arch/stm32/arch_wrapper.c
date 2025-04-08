@@ -11,7 +11,7 @@
 #include "arch_wrapper.h"
 
 
-#ifdef ARCH_SPI_DMA
+#ifdef CD_ARCH_SPI_DMA
 
 void spi_wr(spi_t *dev, const uint8_t *w_buf, uint8_t *r_buf, int len)
 {
@@ -80,12 +80,12 @@ void spi_wr_init(spi_t *dev)
 #endif
 
 
-#ifdef ARCH_CRC_HW
+#ifdef CD_ARCH_CRC_HW
 
 uint16_t crc16_hw_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
 {
     uint16_t ret_val;
-#ifdef CRC_HW_IRQ_SAFE // not recommended, avoid large critical sections
+#ifdef CD_CRC_HW_IRQ_SAFE // not recommended, avoid large critical sections
     uint32_t flags;
     local_irq_save(flags);
 #endif
@@ -109,7 +109,7 @@ uint16_t crc16_hw_sub(const uint8_t *data, uint32_t length, uint16_t crc_val)
         *(volatile uint8_t *)&CRC->DR = *data++;
 
     ret_val = CRC->DR;
-#ifdef CRC_HW_IRQ_SAFE
+#ifdef CD_CRC_HW_IRQ_SAFE
     local_irq_restore(flags);
 #endif
     return ret_val;

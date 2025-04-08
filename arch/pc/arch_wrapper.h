@@ -22,8 +22,8 @@
 
 uint32_t get_systick(void);
 
-#ifndef SYSTICK_US_DIV
-#define SYSTICK_US_DIV  1000
+#ifndef CD_SYSTICK_US_DIV
+#define CD_SYSTICK_US_DIV   1000
 #endif
 
 #endif

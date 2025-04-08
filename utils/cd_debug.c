@@ -5,17 +5,15 @@
  * All rights reserved.
  *
  * Author: Duke Fong <d@d-l.io>
- * Reference: https://electronics.stackexchange.com/questions/206113/
- *                          how-do-i-use-the-printf-function-on-stm32
  */
 
 #include "cdnet_core.h"
 
-#ifndef DBG_STR_LEN
-    #define DBG_STR_LEN 200 // without '\0'
+#ifndef CD_DBG_STR_LEN
+    #define CD_DBG_STR_LEN 200 // without '\0'
 #endif
-#ifndef DBG_MIN_PKT
-    #define DBG_MIN_PKT 10
+#ifndef CD_DBG_MIN_PKT
+    #define CD_DBG_MIN_PKT 10
 #endif
 
 static bool *dbg_en = NULL;
@@ -47,7 +45,7 @@ void _dprintf(char* format, ...)
 
     local_irq_save(flags);
 
-    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT || sock_dbg.ns->free_frm->len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkt->len < CD_DBG_MIN_PKT || sock_dbg.ns->free_frm->len < CD_DBG_MIN_PKT) {
         dbg_lost_cnt++;
         local_irq_restore(flags);
         return;
@@ -73,13 +71,13 @@ void _dprintf(char* format, ...)
     va_start (arg, format);
     // WARN: stack may not enough for reentrant
     // NOTE: size include '\0', return value not include '\0'
-    int tgt_len = vsnprintf((char *)pkt->dat + pkt->len, DBG_STR_LEN + 2 - pkt->len, format, arg);
-    pkt->len += min(DBG_STR_LEN + 1 - pkt->len, tgt_len); // + 1 for dat[0]
+    int tgt_len = vsnprintf((char *)pkt->dat + pkt->len, CD_DBG_STR_LEN + 2 - pkt->len, format, arg);
+    pkt->len += min(CD_DBG_STR_LEN + 1 - pkt->len, tgt_len); // + 1 for dat[0]
 
     va_end (arg);
 
     local_irq_save(flags);
-    if (pkt->dat[pkt->len - 1] == '\n' || pkt->len == DBG_STR_LEN + 1 || pkt_cont) {
+    if (pkt->dat[pkt->len - 1] == '\n' || pkt->len == CD_DBG_STR_LEN + 1 || pkt_cont) {
         cdn_list_put(&dbg_pend, pkt);
     } else {
         pkt_cont = pkt;
@@ -92,7 +90,7 @@ void _dputs(char *str)
     if (!dbg_en || !*dbg_en)
         return;
 
-    if (sock_dbg.ns->free_pkt->len < DBG_MIN_PKT || sock_dbg.ns->free_frm->len < DBG_MIN_PKT) {
+    if (sock_dbg.ns->free_pkt->len < CD_DBG_MIN_PKT || sock_dbg.ns->free_frm->len < CD_DBG_MIN_PKT) {
         uint32_t flags;
         local_irq_save(flags);
         dbg_lost_cnt++;
@@ -135,7 +133,7 @@ void debug_flush(bool wait_empty)
 {
     static int dbg_lost_last = 0;
 
-    if (dbg_lost_last != dbg_lost_cnt && sock_dbg.ns->free_pkt->len >= DBG_MIN_PKT) {
+    if (dbg_lost_last != dbg_lost_cnt && sock_dbg.ns->free_pkt->len >= CD_DBG_MIN_PKT) {
         _dprintf("#: dbg lost: %d -> %d\n", dbg_lost_last, dbg_lost_cnt);
         dbg_lost_last = dbg_lost_cnt;
     }
