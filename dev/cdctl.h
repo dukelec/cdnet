@@ -16,15 +16,23 @@
 typedef struct {
     cd_dev_t    cd_dev;
     const char  *name;
-    uint8_t     version;
     uint32_t    sysclk;
-    bool        _clr_flag; // need manual clr flag if version < 0x0e
 
     list_head_t *free_head;
     list_head_t rx_head;
     list_head_t tx_head;
 
     bool        is_pending;
+
+    uint32_t    rx_cnt;
+    uint32_t    tx_cnt;
+    uint32_t    rx_lost_cnt;
+    uint32_t    rx_error_cnt;
+    uint32_t    rx_break_cnt;
+    uint32_t    tx_cd_cnt;
+    uint32_t    tx_error_cnt;
+    uint32_t    rx_no_free_node_cnt;
+    uint32_t    rx_len_err_cnt;
 
     spi_t       *spi;
     gpio_t      *rst_n;
@@ -54,8 +62,7 @@ typedef struct {
 }
 
 
-void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *rst_n);
+int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init, spi_t *spi);
 
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
@@ -67,7 +74,7 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 
 static inline void cdctl_flush(cdctl_dev_t *dev)
 {
-    cdctl_reg_w(dev, REG_RX_CTRL, BIT_RX_RST_ALL);
+    cdctl_reg_w(dev, CDREG_RX_CTRL, CDBIT_RX_RST_ALL);
 }
 
 void cdctl_routine(cdctl_dev_t *dev);

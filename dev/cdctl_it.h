@@ -29,9 +29,7 @@ typedef enum {
 typedef struct {
     cd_dev_t        cd_dev;
     const char      *name;
-    uint8_t         version;
     uint32_t        sysclk;
-    bool            _clr_flag; // need manual clr flag if version < 0x0e
 
     cdctl_state_t   state;
 
@@ -57,7 +55,6 @@ typedef struct {
     uint32_t        rx_len_err_cnt;
 
     spi_t           *spi;
-    gpio_t          *rst_n;
     gpio_t          *int_n;
     irq_t           int_irq;
 } cdctl_dev_t;
@@ -85,8 +82,8 @@ typedef struct {
     .tx_pre_len = 0x01          \
 }
 
-void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *rst_n, gpio_t *int_n, irq_t int_irq);
+int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
+        spi_t *spi, gpio_t *int_n, irq_t int_irq);
 
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
@@ -98,7 +95,7 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 
 static inline void cdctl_flush(cdctl_dev_t *dev)
 {
-    cdctl_reg_w(dev, REG_RX_CTRL, BIT_RX_RST_ALL);
+    cdctl_reg_w(dev, CDREG_RX_CTRL, CDBIT_RX_RST_ALL);
 }
 
 void cdctl_int_isr(cdctl_dev_t *dev);

@@ -22,6 +22,7 @@
 
 typedef struct {
     list_node_t node;
+//  uint8_t     _pad;
     uint8_t     dat[CD_FRAME_SIZE];
 } cd_frame_t;
 

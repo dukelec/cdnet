@@ -37,7 +37,7 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
     dev->rx_crc = 0xffff;
     dev->local_mac = 0xff; // local_mac should update by caller
 
-#ifdef USE_DYNAMIC_INIT
+#ifdef CD_USE_DYNAMIC_INIT
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
     dev->rx_byte_cnt = 0;

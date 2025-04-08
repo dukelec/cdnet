@@ -11,11 +11,10 @@
 #include "cd_debug.h"
 #include "cdctl_pll_cal.h"
 
-#define CDCTL_MASK (BIT_FLAG_RX_PENDING | BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR |  \
-                    BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)
+#define CDCTL_MASK (CDBIT_FLAG_RX_PENDING | CDBIT_FLAG_RX_LOST | CDBIT_FLAG_RX_ERROR |  \
+                    CDBIT_FLAG_TX_CD | CDBIT_FLAG_TX_ERROR)
 
 
-// used by init and user configuration
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg)
 {
     uint8_t dat = 0xff;
@@ -35,8 +34,6 @@ void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 }
 
 
-// member functions
-
 cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
@@ -47,7 +44,6 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
 
-    dev->tx_cnt++;
     cd_list_put(&dev->tx_head, frame);
     irq_disable(dev->int_irq);
     if (dev->state == CDCTL_IDLE)
@@ -61,25 +57,25 @@ void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
     uint16_t l, h;
     l = DIV_ROUND_CLOSEST(dev->sysclk, low) - 1;
     h = DIV_ROUND_CLOSEST(dev->sysclk, high) - 1;
-    cdctl_reg_w(dev, REG_DIV_LS_L, l & 0xff);
-    cdctl_reg_w(dev, REG_DIV_LS_H, l >> 8);
-    cdctl_reg_w(dev, REG_DIV_HS_L, h & 0xff);
-    cdctl_reg_w(dev, REG_DIV_HS_H, h >> 8);
+    cdctl_reg_w(dev, CDREG_DIV_LS_L, l & 0xff);
+    cdctl_reg_w(dev, CDREG_DIV_LS_H, l >> 8);
+    cdctl_reg_w(dev, CDREG_DIV_HS_L, h & 0xff);
+    cdctl_reg_w(dev, CDREG_DIV_HS_H, h >> 8);
     dn_debug(dev->name, "set baud rate: %u %u (%u %u)\n", low, high, l, h);
 }
 
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 {
     uint16_t l, h;
-    l = cdctl_reg_r(dev, REG_DIV_LS_L) | cdctl_reg_r(dev, REG_DIV_LS_H) << 8;
-    h = cdctl_reg_r(dev, REG_DIV_HS_L) | cdctl_reg_r(dev, REG_DIV_HS_H) << 8;
+    l = cdctl_reg_r(dev, CDREG_DIV_LS_L) | cdctl_reg_r(dev, CDREG_DIV_LS_H) << 8;
+    h = cdctl_reg_r(dev, CDREG_DIV_HS_L) | cdctl_reg_r(dev, CDREG_DIV_HS_H) << 8;
     *low = DIV_ROUND_CLOSEST(dev->sysclk, l + 1);
     *high = DIV_ROUND_CLOSEST(dev->sysclk, h + 1);
 }
 
 
-void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *rst_n, gpio_t *int_n, irq_t int_irq)
+int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
+        spi_t *spi, gpio_t *int_n, irq_t int_irq)
 {
     if (!dev->name)
         dev->name = "cdctl";
@@ -88,7 +84,7 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->cd_dev.get_rx_frame = cdctl_get_rx_frame;
     dev->cd_dev.put_tx_frame = cdctl_put_tx_frame;
 
-#ifdef USE_DYNAMIC_INIT
+#ifdef CD_USE_DYNAMIC_INIT
     dev->state = CDCTL_RST;
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
@@ -99,90 +95,69 @@ void cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->tx_cnt = 0;
     dev->rx_lost_cnt = 0;
     dev->rx_error_cnt = 0;
+    dev->rx_break_cnt = 0;
     dev->tx_cd_cnt = 0;
     dev->tx_error_cnt = 0;
     dev->rx_no_free_node_cnt = 0;
+    dev->rx_len_err_cnt = 0;
 #endif
 
     dev->spi = spi;
-    dev->rst_n = rst_n;
     dev->int_n = int_n;
     dev->int_irq = int_irq;
 
     dn_info(dev->name, "init...\n");
-    if (rst_n) {
-        gpio_set_low(rst_n);
-        delay_systick(2000/SYSTICK_US_DIV);
-        gpio_set_high(rst_n);
-        delay_systick(2000/SYSTICK_US_DIV);
+    uint8_t ver = cdctl_reg_r(dev, CDREG_VERSION);
+    dn_info(dev->name, "chip version: %02x\n", ver);
+    if (ver != 0x10) {
+        dn_error(dev->name, "version error\n");
+        return -1;
     }
 
-    // the fpga has to be read multiple times, the asic does not
-    uint8_t last_ver = 0xff;
-    uint8_t same_cnt = 0;
-    while (true) {
-        uint8_t ver = cdctl_reg_r(dev, REG_VERSION);
-        if (ver != 0x00 && ver != 0xff && ver == last_ver) {
-            if (same_cnt++ > 10)
-                break;
-        } else {
-            last_ver = ver;
-            same_cnt = 0;
-        }
-        debug_flush(false);
-    }
-    dn_info(dev->name, "version: %02x\n", last_ver);
-    dev->version = last_ver;
-    dev->_clr_flag = last_ver >= 0x0e ? false : true;
-
-    if (dev->version >= 0x10) { // asic
-        cdctl_reg_w(dev, REG_CLK_CTRL, 0x80); // soft reset
-        dn_info(dev->name, "version after soft reset: %02x\n", cdctl_reg_r(dev, REG_VERSION));
+    cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x80); // soft reset
+    dn_info(dev->name, "version after soft reset: %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 #ifndef CDCTL_AVOID_PIN_RE
-        cdctl_reg_w(dev, REG_PIN_RE_CTRL, 0x10); // enable phy rx
+    cdctl_reg_w(dev, CDREG_PIN_RE_CTRL, 0x10); // enable phy rx
 #endif
-        dev->sysclk = cdctl_sys_cal(init->baud_h);
-        pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
-        uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
-        d_info("cdctl: sysclk %ld, actual: %d\n", dev->sysclk, actual_freq);
-        dev->sysclk = actual_freq;
-        cdctl_reg_w(dev, REG_PLL_N, pll.n);
-        cdctl_reg_w(dev, REG_PLL_ML, pll.m & 0xff);
-        cdctl_reg_w(dev, REG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));
-        d_info("pll_n: %02x, ml: %02x, od_mh: %02x\n",
-                cdctl_reg_r(dev, REG_PLL_N), cdctl_reg_r(dev, REG_PLL_ML), cdctl_reg_r(dev, REG_PLL_OD_MH));
-        d_info("pll_ctrl: %02x\n", cdctl_reg_r(dev, REG_PLL_CTRL));
-        cdctl_reg_w(dev, REG_PLL_CTRL, 0x10); // enable pll
-        d_info("clk_status: %02x\n", cdctl_reg_r(dev, REG_CLK_STATUS));
-        cdctl_reg_w(dev, REG_CLK_CTRL, 0x01); // select pll
-        d_info("clk_status after select pll: %02x\n", cdctl_reg_r(dev, REG_CLK_STATUS));
-        d_info("version after select pll: %02x\n", cdctl_reg_r(dev, REG_VERSION));
-    } else {
-        dev->sysclk = 40e6L;
-        d_info("fallback to cdctl-b1 module, ver: %02x\n", dev->version);
-    }
+    dev->sysclk = cdctl_sys_cal(init->baud_h);
+    pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
+    uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
+    dn_info(dev->name, "sysclk %ld, actual: %d\n", dev->sysclk, actual_freq);
+    dev->sysclk = actual_freq;
+    cdctl_reg_w(dev, CDREG_PLL_N, pll.n);
+    cdctl_reg_w(dev, CDREG_PLL_ML, pll.m & 0xff);
+    cdctl_reg_w(dev, CDREG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));
+    dn_info(dev->name, "pll_n: %02x, ml: %02x, od_mh: %02x\n",
+            cdctl_reg_r(dev, CDREG_PLL_N), cdctl_reg_r(dev, CDREG_PLL_ML), cdctl_reg_r(dev, CDREG_PLL_OD_MH));
+    dn_info(dev->name, "pll_ctrl: %02x\n", cdctl_reg_r(dev, CDREG_PLL_CTRL));
+    cdctl_reg_w(dev, CDREG_PLL_CTRL, 0x10); // enable pll
+    dn_info(dev->name, "clk_status: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
+    cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x01); // select pll
+    dn_info(dev->name, "clk_status after select pll: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
+    dn_info(dev->name, "version after select pll: %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 
-    uint8_t setting = (cdctl_reg_r(dev, REG_SETTING) & 0xf) | BIT_SETTING_TX_PUSH_PULL;
-    setting |= init->mode == 1 ? BIT_SETTING_BREAK_SYNC : BIT_SETTING_ARBITRATE;
-    cdctl_reg_w(dev, REG_SETTING, setting);
-    cdctl_reg_w(dev, REG_FILTER, init->mac);
-    cdctl_reg_w(dev, REG_FILTER_M0, init->filter_m[0]);
-    cdctl_reg_w(dev, REG_FILTER_M1, init->filter_m[1]);
-    cdctl_reg_w(dev, REG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
-    cdctl_reg_w(dev, REG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
-    cdctl_reg_w(dev, REG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);
-    cdctl_reg_w(dev, REG_MAX_IDLE_LEN_H, init->max_idle_len >> 8);
-    cdctl_reg_w(dev, REG_TX_PRE_LEN, init->tx_pre_len);
+    uint8_t setting = (cdctl_reg_r(dev, CDREG_SETTING) & 0xf) | CDBIT_SETTING_TX_PUSH_PULL;
+    setting |= init->mode == 1 ? CDBIT_SETTING_BREAK_SYNC : CDBIT_SETTING_ARBITRATE;
+    cdctl_reg_w(dev, CDREG_SETTING, setting);
+    cdctl_reg_w(dev, CDREG_FILTER, init->mac);
+    cdctl_reg_w(dev, CDREG_FILTER_M0, init->filter_m[0]);
+    cdctl_reg_w(dev, CDREG_FILTER_M1, init->filter_m[1]);
+    cdctl_reg_w(dev, CDREG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
+    cdctl_reg_w(dev, CDREG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
+    cdctl_reg_w(dev, CDREG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);
+    cdctl_reg_w(dev, CDREG_MAX_IDLE_LEN_H, init->max_idle_len >> 8);
+    cdctl_reg_w(dev, CDREG_TX_PRE_LEN, init->tx_pre_len);
     cdctl_set_baud_rate(dev, init->baud_l, init->baud_h);
     cdctl_flush(dev);
 
     cdctl_get_baud_rate(dev, &init->baud_l, &init->baud_h);
-    d_debug("cdctl: get baud rate: %lu %lu\n", init->baud_l, init->baud_h);
-    d_debug("cdctl: get filter(m): %02x (%02x %02x)\n",
-            cdctl_reg_r(dev, REG_FILTER), cdctl_reg_r(dev, REG_FILTER_M0), cdctl_reg_r(dev, REG_FILTER_M1));
-    dn_debug(dev->name, "flags: %02x\n", cdctl_reg_r(dev, REG_INT_FLAG));
+    dn_debug(dev->name, "get baud rate: %lu %lu\n", init->baud_l, init->baud_h);
+    dn_debug(dev->name, "get filter(m): %02x (%02x %02x)\n",
+            cdctl_reg_r(dev, CDREG_FILTER), cdctl_reg_r(dev, CDREG_FILTER_M0), cdctl_reg_r(dev, CDREG_FILTER_M1));
+    dn_debug(dev->name, "flags: %02x\n", cdctl_reg_r(dev, CDREG_INT_FLAG));
     dev->state = CDCTL_IDLE;
-    cdctl_reg_w(dev, REG_INT_MASK, CDCTL_MASK);
+    cdctl_reg_w(dev, CDREG_INT_MASK, CDCTL_MASK);
+    return 0;
 }
 
 
@@ -207,7 +182,7 @@ void cdctl_int_isr(cdctl_dev_t *dev)
 {
     if (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN) {
         dev->state = CDCTL_RD_FLAG;
-        cdctl_reg_r_it(dev, REG_INT_FLAG);
+        cdctl_reg_r_it(dev, CDREG_INT_FLAG);
     }
 }
 
@@ -217,52 +192,27 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     // end of CDCTL_RD_FLAG
     if (dev->state == CDCTL_RD_FLAG) {
         uint8_t val = dev->buf[1];
-        uint8_t ret = 0;
         gpio_set_high(dev->spi->ns_pin);
 
-
-        if (val & (BIT_FLAG_RX_LOST | BIT_FLAG_RX_ERROR | BIT_FLAG_RX_BREAK | \
-                BIT_FLAG_TX_CD | BIT_FLAG_TX_ERROR)) {
-            // check rx error
-            if (val & BIT_FLAG_RX_LOST) {
-                ret |= BIT_RX_CLR_LOST;
+        if (val & (CDBIT_FLAG_RX_LOST | CDBIT_FLAG_RX_ERROR | CDBIT_FLAG_RX_BREAK | \
+                CDBIT_FLAG_TX_CD | CDBIT_FLAG_TX_ERROR)) {
+            if (val & CDBIT_FLAG_RX_LOST)
                 dev->rx_lost_cnt++;
-            }
-            if (val & BIT_FLAG_RX_ERROR) {
-                ret |= BIT_RX_CLR_ERROR;
+            if (val & CDBIT_FLAG_RX_ERROR)
                 dev->rx_error_cnt++;
-            }
-            if (val & BIT_FLAG_RX_BREAK) {
-                ret |= BIT_RX_CLR_BREAK;
+            if (val & CDBIT_FLAG_RX_BREAK)
                 dev->rx_break_cnt++;
-            }
-            if (ret && dev->_clr_flag) {
-                dev->state = CDCTL_REG_W;
-                cdctl_reg_w_it(dev, REG_RX_CTRL, ret);
-                return;
-            }
-
-            // check tx error
-            if (val & BIT_FLAG_TX_CD) {
-                ret |= BIT_TX_CLR_CD;
+            if (val & CDBIT_FLAG_TX_CD)
                 dev->tx_cd_cnt++;
-            }
-            if (val & BIT_FLAG_TX_ERROR) {
-                ret |= BIT_TX_CLR_ERROR;
+            if (val & CDBIT_FLAG_TX_ERROR)
                 dev->tx_error_cnt++;
-            }
-            if (ret && dev->_clr_flag) {
-                dev->state = CDCTL_REG_W;
-                cdctl_reg_w_it(dev, REG_TX_CTRL, ret);
-                return;
-            }
         }
 
         // check for new frame
-        if (val & BIT_FLAG_RX_PENDING) {
+        if (val & CDBIT_FLAG_RX_PENDING) {
             dev->state = CDCTL_RX_HEADER;
             uint8_t *buf = dev->rx_frame->dat - 1;
-            *buf = REG_RX; // borrow space from the "node" item
+            *buf = CDREG_RX; // borrow space from the "node" item
             gpio_set_low(dev->spi->ns_pin);
             spi_wr_it(dev->spi, buf, buf, 4);
             return;
@@ -270,23 +220,23 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
 
         // check for tx
         if (dev->tx_wait_trigger) {
-            if (val & BIT_FLAG_TX_BUF_CLEAN) {
+            if (val & CDBIT_FLAG_TX_BUF_CLEAN) {
                 dev->tx_wait_trigger = false;
 
                 dev->state = CDCTL_REG_W;
-                cdctl_reg_w_it(dev, REG_TX_CTRL, BIT_TX_START | BIT_TX_RST_POINTER);
+                cdctl_reg_w_it(dev, CDREG_TX_CTRL, CDBIT_TX_START | CDBIT_TX_RST_POINTER);
                 return;
             } else if (!dev->tx_buf_clean_mask) {
                 // enable tx_buf_clean irq
                 dev->tx_buf_clean_mask = true;
                 dev->state = CDCTL_REG_W;
-                cdctl_reg_w_it(dev, REG_INT_MASK, CDCTL_MASK | BIT_FLAG_TX_BUF_CLEAN);
+                cdctl_reg_w_it(dev, CDREG_INT_MASK, CDCTL_MASK | CDBIT_FLAG_TX_BUF_CLEAN);
                 return;
             }
         } else if (dev->tx_head.first) {
             dev->tx_frame = cd_list_get(&dev->tx_head);
             uint8_t *buf = dev->tx_frame->dat - 1;
-            *buf = REG_TX | 0x80; // borrow space from the "node" item
+            *buf = CDREG_TX | 0x80; // borrow space from the "node" item
             dev->state = CDCTL_TX_FRAME;
             gpio_set_low(dev->spi->ns_pin);
             spi_wr_it(dev->spi, buf, NULL, 4 + buf[3]);
@@ -294,7 +244,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         } else if (dev->tx_buf_clean_mask) {
             dev->tx_buf_clean_mask = false;
             dev->state = CDCTL_REG_W;
-            cdctl_reg_w_it(dev, REG_INT_MASK, CDCTL_MASK);
+            cdctl_reg_w_it(dev, CDREG_INT_MASK, CDCTL_MASK);
             return;
         }
 
@@ -308,7 +258,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     if (dev->state == CDCTL_REG_W) {
         gpio_set_high(dev->spi->ns_pin);
         dev->state = CDCTL_RD_FLAG;
-        cdctl_reg_r_it(dev, REG_INT_FLAG);
+        cdctl_reg_r_it(dev, CDREG_INT_FLAG);
         return;
     }
 
@@ -318,7 +268,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         if (dev->rx_frame->dat[2] > min(CD_FRAME_SIZE - 3, 253)) {
             dev->rx_len_err_cnt++;
             dev->state = CDCTL_REG_W;
-            cdctl_reg_w_it(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
+            cdctl_reg_w_it(dev, CDREG_RX_CTRL, CDBIT_RX_CLR_PENDING | CDBIT_RX_RST_POINTER);
             return;
         }
         if (dev->rx_frame->dat[2] != 0) {
@@ -339,7 +289,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
             dev->rx_no_free_node_cnt++;
         }
         dev->state = CDCTL_REG_W;
-        cdctl_reg_w_it(dev, REG_RX_CTRL, BIT_RX_CLR_PENDING | BIT_RX_RST_POINTER);
+        cdctl_reg_w_it(dev, CDREG_RX_CTRL, CDBIT_RX_CLR_PENDING | CDBIT_RX_RST_POINTER);
         return;
     }
 
@@ -350,9 +300,10 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         cd_list_put(dev->free_head, dev->tx_frame);
         dev->tx_frame = NULL;
         dev->tx_wait_trigger = true;
+        dev->tx_cnt++;
 
         dev->state = CDCTL_RD_FLAG;
-        cdctl_reg_r_it(dev, REG_INT_FLAG);
+        cdctl_reg_r_it(dev, CDREG_INT_FLAG);
         return;
     }
 
