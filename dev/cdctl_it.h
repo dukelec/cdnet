@@ -27,36 +27,36 @@ typedef enum {
 } cdctl_state_t;
 
 typedef struct {
-    cd_dev_t        cd_dev;
-    const char      *name;
-    uint32_t        sysclk;
+    cd_dev_t                cd_dev;
+    const char              *name;
+    uint32_t                sysclk;
 
-    cdctl_state_t   state;
+    volatile cdctl_state_t  state;
 
-    list_head_t     *free_head;
-    list_head_t     rx_head;
-    list_head_t     tx_head;
+    list_head_t             *free_head;
+    list_head_t             rx_head;
+    list_head_t             tx_head;
 
-    cd_frame_t      *rx_frame;
-    cd_frame_t      *tx_frame;
-    bool            tx_wait_trigger;
-    bool            tx_buf_clean_mask;
+    cd_frame_t              *rx_frame;
+    cd_frame_t              *tx_frame;
+    bool                    tx_wait_trigger;
+    bool                    tx_buf_clean_mask;
 
-    uint8_t         buf[2];
+    uint8_t                 buf[2];
 
-    uint32_t        rx_cnt;
-    uint32_t        tx_cnt;
-    uint32_t        rx_lost_cnt;
-    uint32_t        rx_error_cnt;
-    uint32_t        rx_break_cnt;
-    uint32_t        tx_cd_cnt;
-    uint32_t        tx_error_cnt;
-    uint32_t        rx_no_free_node_cnt;
-    uint32_t        rx_len_err_cnt;
+    volatile uint32_t       rx_cnt;
+    volatile uint32_t       tx_cnt;
+    volatile uint32_t       rx_lost_cnt;
+    volatile uint32_t       rx_error_cnt;
+    volatile uint32_t       rx_break_cnt;
+    volatile uint32_t       tx_cd_cnt;
+    volatile uint32_t       tx_error_cnt;
+    volatile uint32_t       rx_no_free_node_cnt;
+    volatile uint32_t       rx_len_err_cnt;
 
-    spi_t           *spi;
-    gpio_t          *int_n;
-    irq_t           int_irq;
+    spi_t                   *spi;
+    gpio_t                  *int_n;
+    irq_t                   int_irq;
 } cdctl_dev_t;
 
 typedef struct {
