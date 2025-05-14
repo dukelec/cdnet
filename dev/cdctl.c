@@ -51,11 +51,12 @@ void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
     cd_list_put(&dev->tx_head, frame);
 }
 
+
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    l = DIV_ROUND_CLOSEST(dev->sysclk, low) - 1;
-    h = DIV_ROUND_CLOSEST(dev->sysclk, high) - 1;
+    l = min(65535, max(2, DIV_ROUND_CLOSEST(dev->sysclk, low) - 1));
+    h = min(65535, max(2, DIV_ROUND_CLOSEST(dev->sysclk, high) - 1));
     cdctl_reg_w(dev, CDREG_DIV_LS_L, l & 0xff);
     cdctl_reg_w(dev, CDREG_DIV_LS_H, l >> 8);
     cdctl_reg_w(dev, CDREG_DIV_HS_L, h & 0xff);
@@ -70,6 +71,29 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
     h = cdctl_reg_r(dev, CDREG_DIV_HS_L) | cdctl_reg_r(dev, CDREG_DIV_HS_H) << 8;
     *low = DIV_ROUND_CLOSEST(dev->sysclk, l + 1);
     *high = DIV_ROUND_CLOSEST(dev->sysclk, h + 1);
+}
+
+void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud)
+{
+    cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x00); // select osc
+    dn_info(dev->name, "version (clk: osc): %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
+
+    dev->sysclk = cdctl_sys_cal(target_baud);
+    pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
+    uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
+    dn_info(dev->name, "sysclk %ld, actual: %d\n", dev->sysclk, actual_freq);
+    dev->sysclk = actual_freq;
+    cdctl_reg_w(dev, CDREG_PLL_N, pll.n);
+    cdctl_reg_w(dev, CDREG_PLL_ML, pll.m & 0xff);
+    cdctl_reg_w(dev, CDREG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));
+    dn_info(dev->name, "pll_n: %02x, ml: %02x, od_mh: %02x\n",
+            cdctl_reg_r(dev, CDREG_PLL_N), cdctl_reg_r(dev, CDREG_PLL_ML), cdctl_reg_r(dev, CDREG_PLL_OD_MH));
+    dn_info(dev->name, "pll_ctrl: %02x\n", cdctl_reg_r(dev, CDREG_PLL_CTRL));
+    cdctl_reg_w(dev, CDREG_PLL_CTRL, 0x10); // enable pll
+    dn_info(dev->name, "clk_status: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
+    cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x01); // select pll
+    dn_info(dev->name, "clk_status (clk: pll): %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
+    dn_info(dev->name, "version (clk: pll): %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 }
 
 
@@ -106,26 +130,10 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init, 
     }
 
     cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x80); // soft reset
-    dn_info(dev->name, "version after soft reset: %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
+    cdctl_set_clk(dev, init->baud_h);
 #ifndef CDCTL_AVOID_PIN_RE
     cdctl_reg_w(dev, CDREG_PIN_RE_CTRL, 0x10); // enable phy rx
 #endif
-    dev->sysclk = cdctl_sys_cal(init->baud_h);
-    pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
-    uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
-    dn_info(dev->name, "sysclk %ld, actual: %d\n", dev->sysclk, actual_freq);
-    dev->sysclk = actual_freq;
-    cdctl_reg_w(dev, CDREG_PLL_N, pll.n);
-    cdctl_reg_w(dev, CDREG_PLL_ML, pll.m & 0xff);
-    cdctl_reg_w(dev, CDREG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));
-    dn_info(dev->name, "pll_n: %02x, ml: %02x, od_mh: %02x\n",
-            cdctl_reg_r(dev, CDREG_PLL_N), cdctl_reg_r(dev, CDREG_PLL_ML), cdctl_reg_r(dev, CDREG_PLL_OD_MH));
-    dn_info(dev->name, "pll_ctrl: %02x\n", cdctl_reg_r(dev, CDREG_PLL_CTRL));
-    cdctl_reg_w(dev, CDREG_PLL_CTRL, 0x10); // enable pll
-    dn_info(dev->name, "clk_status: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
-    cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x01); // select pll
-    dn_info(dev->name, "clk_status after select pll: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
-    dn_info(dev->name, "version after select pll: %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 
     uint8_t setting = (cdctl_reg_r(dev, CDREG_SETTING) & 0xf) | CDBIT_SETTING_TX_PUSH_PULL;
     setting |= init->mode == 1 ? CDBIT_SETTING_BREAK_SYNC : CDBIT_SETTING_ARBITRATE;

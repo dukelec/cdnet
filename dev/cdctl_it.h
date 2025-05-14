@@ -87,6 +87,7 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
+void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud);
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high);
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high);
 

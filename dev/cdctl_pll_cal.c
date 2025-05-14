@@ -75,7 +75,7 @@ uint32_t cdctl_sys_cal(uint32_t baud) {
     uint32_t clk_step = 2e5L;
 
     for (uint32_t c = clk_max; c >= clk_min; c -= clk_step) {
-        uint32_t div = DIV_ROUND_CLOSEST(c, baud);
+        uint32_t div = min(65535, DIV_ROUND_CLOSEST(c, baud));
         uint32_t error = abs((int32_t)(DIV_ROUND_CLOSEST(c, div) - baud));
 
         if (error < best[1]) {
