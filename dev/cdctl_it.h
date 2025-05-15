@@ -39,7 +39,7 @@ typedef struct {
 
     cd_frame_t              *rx_frame;
     cd_frame_t              *tx_frame;
-    bool                    tx_wait_trigger;
+    cd_frame_t              *tx_wait_trigger;
     bool                    tx_buf_clean_mask;
 
     uint8_t                 buf[2];
@@ -101,5 +101,8 @@ static inline void cdctl_flush(cdctl_dev_t *dev)
 
 void cdctl_int_isr(cdctl_dev_t *dev);
 void cdctl_spi_isr(cdctl_dev_t *dev);
+
+void cdctl_rx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
+void cdctl_tx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
 
 #endif

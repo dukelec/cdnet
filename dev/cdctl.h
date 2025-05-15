@@ -22,7 +22,7 @@ typedef struct {
     list_head_t rx_head;
     list_head_t tx_head;
 
-    bool        is_pending;
+    cd_frame_t  *is_pending;
 
     uint32_t    rx_cnt;
     uint32_t    tx_cnt;
@@ -79,5 +79,7 @@ static inline void cdctl_flush(cdctl_dev_t *dev)
 }
 
 void cdctl_routine(cdctl_dev_t *dev);
+
+void cdctl_tx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
 
 #endif

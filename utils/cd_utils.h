@@ -18,6 +18,7 @@
 #include <stdbool.h>
 #include <stddef.h>     // provide offsetof, NULL
 #include <stdint.h>
+#include <inttypes.h>
 
 #ifdef __has_include
 #if __has_include("cd_config.h")
