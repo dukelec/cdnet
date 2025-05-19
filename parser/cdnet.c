@@ -43,7 +43,8 @@ int cdn_hdr_size_frm(const cd_frame_t *frm)
     uint8_t hdr = frm->dat[3];
     int hdr_size = 1;
     
-    if ((hdr & 0xc0) == 0)          // level 0 request
+    if ((hdr & 0xc0) == 0)
+        return 1;                   // level 0 request
     if ((hdr & 0xc0) == 0x40)
         return 0;                   // level 0 reply
 
