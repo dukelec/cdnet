@@ -15,23 +15,14 @@ int cdn0_hdr_w(const cdn_pkt_t *pkt, uint8_t *hdr)
 {
     const cdn_sockaddr_t *src = &pkt->src;
     const cdn_sockaddr_t *dst = &pkt->dst;
-    const uint8_t *dat = pkt->dat;
 
     cdn_assert(dst->addr[0] == 0x00);
-    cdn_assert((src->port == CDN_DEF_PORT && dst->port <= 63) || dst->port == CDN_DEF_PORT);
+    cdn_assert((src->port & 0xff80) == 0);
+    cdn_assert((dst->port & 0xff80) == 0);
 
-    if (src->port == CDN_DEF_PORT) {    // out request
-#ifndef CDN_L0_C
-        cdn_assert(false);              // not support
-#endif
-        *hdr = dst->port;               // hdr
-        return 1;
-    } else {                            // out reply
-        cdn_assert(pkt->len >= 1);
-        cdn_assert((dat[0] & 0xc0) == CDN0_SHARE_LEFT);
-        *hdr = CDN_HDR_L0_REPLY | (dat[0] & 0x3f); // share first byte
-        return 0;
-    }
+    *hdr = src->port;
+    *(hdr + 1) = dst->port;
+    return 2;
 }
 
 int cdn0_frame_w(cdn_pkt_t *pkt)
@@ -52,7 +43,7 @@ int cdn0_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
     cdn_sockaddr_t *src = &pkt->src;
     cdn_sockaddr_t *dst = &pkt->dst;
 
-    cdn_assert(!(*hdr & 0x80));
+    cdn_assert((*hdr & 0x80) == 0);
     src->addr[0] = 0;
     src->addr[1] = pkt->_l_net;
     dst->addr[0] = 0;
@@ -60,22 +51,13 @@ int cdn0_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
     src->addr[2] = pkt->_s_mac;
     dst->addr[2] = pkt->_d_mac;
 
-    if (*hdr & CDN_HDR_L0_REPLY) {  // in reply
-#ifdef CDN_L0_C
-        src->port = pkt->_l0_lp;
-        dst->port = CDN_DEF_PORT;
-#else
-        cdn_assert(false);          // not support
-#endif
-        return 0;
-    } else {                        // in request
-        src->port = CDN_DEF_PORT;
-        dst->port = *hdr;
-        return 1;
-    }
+    src->port = *hdr;
+    dst->port = *(hdr + 1);
+    cdn_assert((dst->port & 0x80) == 0);
+    return 2;
 }
 
-// addition in: _l_net, _l0_lp (central only)
+// addition in: _l_net
 int cdn0_frame_r(cdn_pkt_t *pkt)
 {
     uint8_t *frame = pkt->frm->dat;
@@ -86,7 +68,5 @@ int cdn0_frame_r(cdn_pkt_t *pkt)
         return len;
     pkt->dat = frame + 3 + len;
     pkt->len = frame[2] - len;
-    if (len == 0)
-        frame[3] = (frame[3] & 0x3f) | CDN0_SHARE_LEFT;
     return 0;
 }

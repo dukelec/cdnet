@@ -1,53 +1,48 @@
 CDNET: An Optional High-Layer Protocol for CDBUS
 =======================================
 
-Protocol status: Stable [Version 1.0]
+Protocol status: Stable [Version 2.0]
 
-The CDBUS frame containing a CDNET package is as follows:  
+A CDBUS frame carrying a CDNET packet is structured as follows:  
 `[src, dst, len] + [CDNET package] + [crc_l, crc_h]`  
+or equivalently:  
 `[src, dst, len] + [CDNET header, payload] + [crc_l, crc_h]`
 
 
 ## CDNET Levels
 
-CDNET protocol offers two levels, determined by bit7 of the first header byte:
+CDNET defines two protocol levels, determined by bit 7 of the first header byte:
 
 | Bit7 | DESCRIPTION                                                   |
 |------|---------------------------------------------------------------|
 | 0    | Level 0: Simplified communication                             |
 | 1    | Level 1: Standard communication                               |
 
-You can select one or more levels for your application as required.
+Applications may support either or both levels, depending on requirements.
 
-The CDNET is little endian.
+CDNET uses little-endian byte order.
 
 
 ## Level 0 Format
 
-### Request
-A single-byte header:
+The header is always 2 bytes.
+
+First byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------|
-| [7]     | Always 0: Level 0                                 |
-| [6]     | Always 0: request                                 |
-| [5:0]   | dst_port, range 0 ~ 0x3f                          |
+| [7]     | Always 0 (indicates level 0)                      |
+| [6:0]   | src_port, range 0 ~ 127                           |
 
-Note: The port is analogous to UDP port and can be thought of simply as command.
-
-### Reply
-A single-byte header:
+Second byte:
 
 | FIELD   | DESCRIPTION                                       |
 |-------- |---------------------------------------------------|
-| [7]     | Always 0: Level 0                                 |
-| [6]     | Always 1: reply                                   |
-| [5:0]   | Low bits of first payload byte                    |
+| [7]     | _Reserved as 0_                                   |
+| [6:0]   | dst_port, range 0 ~ 127                           |
 
-The first payload byte omits bits [7:6], which were intended to be `b10`.
 
-E.g.: Header `0x42` implies `0x82` as the first byte of the payload.
-
+Note: The port number is similar to the UDP port number.
 
 
 ## Level 1 Format
@@ -55,11 +50,13 @@ The first byte of the header:
 
 | FIELD   | DESCRIPTION                     |
 |-------- |---------------------------------|
-| [7]     | Always 1                        |
+| [7]     | Always 1 (indicates level 1)    |
+| [6]     | _Reserved as 0_                 |
 | [5]     | MULTI_NET                       |
 | [4]     | MULTICAST                       |
-| [2:1]   | PORT_SIZE                       |
-| [6][3][0] | _Reserved as 0_               |
+| [3:2]   | _Reserved as 0_                 |
+| [1]     | SRC_PORT_SIZE                   |
+| [0]     | DST_PORT_SIZE                   |
 
 ### MULTI_NET & MULTICAST
 
@@ -71,50 +68,34 @@ The first byte of the header:
 | 1         | 1         | Cross net multicast: append 4 bytes: `[src_net, src_mac, mh, ml]`         |
 
 Notes:
- - mh + ml: multicast_id, ml is mapped to mac layer multicast address (h: high byte, l: low byte);
+ - mh/ml: multicast_id, ml is mapped to mac layer multicast address (h: high byte, l: low byte);
  - Could simply use MULTI_NET = 0 and MULTICAST = 0 for local net multicast and broadcast.
  - Implementations of MULTI_NET and MULTICAST are optional.
 
 ### PORT_SIZE:
 
-| Bit2 | Bit1 | SRC_PORT      | DST_PORT      |
-|------|------|---------------|---------------|
-| 0    | 0    | Default port  | 1-byte        |
-| 0    | 1    | 1-byte        | Default port  |
-| 1    | 0    | 1-byte        | 1-byte        |
-| 1    | 1    | 2-byte        | 2-byte        |
+| Bit1 | SRC_PORT      |
+|------|---------------|
+| 0    | 1-byte        |
+| 1    | 2-byte        |
+
+| Bit0 | DST_PORT      |
+|------|---------------|
+| 0    | 1-byte        |
+| 1    | 2-byte        |
 
 Notes:
- - The default port is `0xcdcd` for convention and doesn't consume space.
  - Append bytes for `src_port` before `dst_port`.
  - Implementation of 2-byte port is optional.
 
 
-
-## Recommendation for first byte of payload
-
-For Request and Report, the first byte definition:
-
-| FIELD   | DESCRIPTION                         |
-|-------- |-------------------------------------|
-| [7]     | is_reply, always 0                  |
-| [6]     | not_reply                           |
-| [5:0]   | sub command                         |
-
-For Reply, the first byte definition:
-
-| FIELD   | DESCRIPTION                     |
-|-------- |---------------------------------|
-| [7]     | is_reply, always 1              |
-| [6:0]   | status, 0 means no error        |
-
-
-
 ## Port Allocation Recommendation
 
-Ports 0 to 0xf are recommended for general purposes.
-Specifically, port 1 is designated for device information queries.
-While all ports in this section are optional, it is advisable to implement the basic function of port 1 (read device_info).
+Ports 0 to 15 are recommended for general-purpose use.  
+Specifically, port 1 is designated for device information queries.  
+While the port assignments mentioned in this section are optional, it is recommended to implement the basic function of port 1 (`read_device_info`).
+
+Port numbers ≥ 64 are typically used as ephemeral ports.
 
 
 ### Port 1
@@ -129,12 +110,12 @@ Types:
 
 
 Read device_info string:
-  Write [0x00]
-  Return [0x80, "device_info"]
+  Write None
+  Return ["device_info"]
 
 Search devices by filters (for resolving mac conflicts):
   Write [0x10, max_time, mac_start, mac_end, "string"]
-  Return [0x80, "device_info"] after a random time in the range [0, max_time]
+  Return ["device_info"] after a random time in the range [0, max_time]
     only if "device_info" contains "string" (always true for an empty string)
     and the current mac address is in the range [mac_start, mac_end] (inclusive)
   Not return otherwise
@@ -156,7 +137,7 @@ level1:                    80:NN:MM        a0:NN:MM       f0:MH:ML
 ```
 
 Notes:
-  - NN: net_id, MM: mac_addr, MH+ML: multicast_id (H: high byte, L: low byte).
+  - NN: net_id, MM: mac_addr, MH/ML: multicast_id (H: high byte, L: low byte).
   - The string address is analogous to IPv6 address.
 
 
@@ -170,44 +151,30 @@ expressed in hexadecimal: `[0x4d, 0x3a, 0x20, 0x63, 0x31, 0x3b, 0x20, 0x53, 0x3a
 
 The Level 0 Format:
  * Request:
-   - CDNET socket: `[00:00:0c]:0xcdcd` -> `[00:00:0d]:1`: `0x00` (net id: `0`)
-   - CDNET packet: `[0x01,  0x00]` (`dst_port`: `0x01`)
-   - CDBUS frame: `[0x0c, 0x0d, 0x02,  0x01, 0x00,  crc_l, crc_h]`
+   - CDNET socket: `[00:00:0c]:64` -> `[00:00:0d]:1`: `None`
+   - CDNET packet: `[0x40, 0x01]` (`src_port`: `0x40`, `dst_port`: `0x01`)
+   - CDBUS frame: `[0x0c, 0x0d, 0x02,  0x40, 0x01,  crc_l, crc_h]`
  * Reply:
-   - CDNET socket: `[00:00:0d]:1` -> `[00:00:0c]:0xcdcd`: `0x80` + `"M: c1; S: 1234"`
-   - CDNET packet: `[0x40, 0x4d, 0x3a, 0x20 ... 0x34]` (first `0x40` implies payload byte `0x80`)
-   - CDBUS frame: `[0x0d, 0x0c, 0x0f,  0x40, 0x4d, 0x3a, 0x20 ... 0x34,  crc_l, crc_h]`
+   - CDNET socket: `[00:00:0d]:1` -> `[00:00:0c]:64`: `"M: c1; S: 1234"`
+   - CDNET packet: `[0x01, 0x40,  0x4d, 0x3a, 0x20 ... 0x34]`
+   - CDBUS frame: `[0x0d, 0x0c, 0x10,  0x01, 0x40,  0x4d, 0x3a, 0x20 ... 0x34,  crc_l, crc_h]`
 
 The Level 1 Format:
  * Request:
-   - CDNET socket: `[80:00:0c]:0xcdcd` -> `[80:00:0d]:1`: `0x00`
-   - CDNET packet: `[0x80, 0x01,  0x00]` (`src_port`: default, `dst_port`: `0x01`)
-   - CDBUS frame: `[0x0c, 0x0d, 0x03,  0x80, 0x01, 0x00,  crc_l, crc_h]`
+   - CDNET socket: `[80:00:0c]:64` -> `[80:00:0d]:1`: `None`
+   - CDNET packet: `[0x80, 0x40, 0x01]` (`src_port`: `0x40`, `dst_port`: `0x01`)
+   - CDBUS frame: `[0x0c, 0x0d, 0x03,  0x80, 0x40, 0x01,  crc_l, crc_h]`
  * Reply:
-   - CDNET socket: `[80:00:0d]:1` -> `[80:00:0c]:0xcdcd`: `0x80` + `"M: c1; S: 1234"`
-   - CDNET packet: `[0x82, 0x01,  0x80, 0x4d, 0x3a, 0x20 ... 0x34]` (`src_port`: `0x01`, `dst_port`: default)
-   - CDBUS frame: `[0x0d, 0x0c, 0x11,  0x82, 0x01, 0x80, 0x4d, 0x3a, 0x20 ... 0x34,  crc_l, crc_h]`
-
+   - CDNET socket: `[80:00:0d]:1` -> `[80:00:0c]:64`: `"M: c1; S: 1234"`
+   - CDNET packet: `[0x80, 0x01, 0x40,  0x4d, 0x3a, 0x20 ... 0x34]` (`src_port`: `0x01`, `dst_port`: `0x40`)
+   - CDBUS frame: `[0x0d, 0x0c, 0x11,  0x80, 0x01, 0x40,  0x4d, 0x3a, 0x20 ... 0x34,  crc_l, crc_h]`
 
 
 ### Sequence & Flow Control
 
-For transferring large data, such as transmitting a jpg image in the `cdcam` project, the sub command is defined as follows:
+For different commands, `SRC_PORT` can increment sequentially within a defined range. This allows the receiver to avoid re-executing commands during retransmissions and ensures correct matching between requests and responses.
 
-```
-[5:4] FRAGMENT: 00: not fragment, 01: first, 10: more, 11: last, [3:0]: cnt
-```
+For large data transfers, a high bit in `SRC_PORT` can be used as a `not_reply` flag. When set, the receiver does not send a reply.  
+The lower bits of `SRC_PORT` increment to indicate the sequence.
 
-Here, the `cnt` value corresponds to 0 for the first packet, and increments by 1 for each subsequent packet.
-
-If flow control is required, for example, we can group every 12 packets as a transmission set,
-where only the last packet in each set has `not_reply` set to 0. Start by transmitting 2 sets of packets,
-wait for a reply regarding the last packet in the first set, and then append another set of packets.
-
-For sub commands that do not have a `cnt` definition like the one mentioned above,
-if we want to ensure the uniqueness of a command, such as ensuring that a command can only be executed once,
-we can also achieve this by cyclically sending commands through multiple source port numbers.
-
-This way, if a command does not receive a reply, resend the command.
-The receiving port checks whether the source port number of the received command matches that of the previous command;
-if they match, the command is not executed again.
+We can begin by sending two groups of packets, each requiring a reply only for the last packet. Upon receiving a reply, the next group can be sent. Each group contains multiple packets.

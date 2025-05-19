@@ -11,44 +11,8 @@
 #include "cdnet.h"
 
 
-static void get_port_size(uint8_t val, uint8_t *src_size, uint8_t *dst_size)
-{
-    switch (val) {
-    case 0x00: *src_size = 0; *dst_size = 1; break;
-    case 0x02: *src_size = 1; *dst_size = 0; break;
-    case 0x04: *src_size = 1; *dst_size = 1; break;
-    default:   *src_size = 2; *dst_size = 2;
-    }
-}
-
-static int cal_port_val(uint16_t src, uint16_t dst, uint8_t *src_size, uint8_t *dst_size)
-{
-    if (src == CDN_DEF_PORT)
-        *src_size = 0;
-    else if (src <= 0xff)
-        *src_size = 1;
-    else
-        *src_size = 2;
-
-    if (dst == CDN_DEF_PORT && src != CDN_DEF_PORT)
-        *dst_size = 0;
-    else if (dst <= 0xff)
-        *dst_size = 1;
-    else
-        *dst_size = 2;
-
-    switch ((*src_size << 4) | *dst_size) {
-    case 0x01: return 0x00;
-    case 0x10: return 0x02;
-    case 0x11: return 0x04;
-    default:   return 0x06;
-    }
-}
-
-
 int cdn1_hdr_w(const cdn_pkt_t *pkt, uint8_t *hdr)
 {
-    uint8_t s_port_size, d_port_size;
     const cdn_sockaddr_t *src = &pkt->src;
     const cdn_sockaddr_t *dst = &pkt->dst;
     uint8_t *buf = hdr + 1;
@@ -70,15 +34,17 @@ int cdn1_hdr_w(const cdn_pkt_t *pkt, uint8_t *hdr)
         *buf++ = dst->addr[2];
     }
 
-    *hdr |= cal_port_val(src->port, dst->port, &s_port_size, &d_port_size);
-    if (s_port_size >= 1)
-        *buf++ = src->port & 0xff;
-    if (s_port_size == 2)
+    *buf++ = src->port & 0xff;
+    if (src->port & 0xff00) {
         *buf++ = src->port >> 8;
-    if (d_port_size >= 1)
-        *buf++ = dst->port & 0xff;
-    if (d_port_size == 2)
+        *hdr |= 2;
+    }
+
+    *buf++ = dst->port & 0xff;
+    if (dst->port & 0xff00) {
         *buf++ = dst->port >> 8;
+        *hdr |= 1;
+    }
 
     return buf - hdr;
 }
@@ -99,7 +65,6 @@ int cdn1_frame_w(cdn_pkt_t *pkt)
 
 int cdn1_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
 {
-    uint8_t s_port_size, d_port_size;
     cdn_sockaddr_t *src = &pkt->src;
     cdn_sockaddr_t *dst = &pkt->dst;
 
@@ -126,23 +91,14 @@ int cdn1_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
         dst->addr[2] = pkt->_d_mac;
     }
 
-    get_port_size(*hdr & 0x06, &s_port_size, &d_port_size);
-    if (s_port_size == 0) {
-        src->port = CDN_DEF_PORT;
-    } else {
-        if (s_port_size >= 1)
-            src->port = *buf++;
-        if (s_port_size == 2)
-            src->port |= *buf++ << 8;
-    }
-    if (d_port_size == 0) {
-        dst->port = CDN_DEF_PORT;
-    } else {
-        if (d_port_size >= 1)
-            dst->port = *buf++;
-        if (d_port_size == 2)
-            dst->port |= *buf++ << 8;
-    }
+    src->port = *buf++;
+    if (*hdr & 2)
+        src->port |= *buf++ << 8;
+
+    dst->port = *buf++;
+    if (*hdr & 1)
+        dst->port |= *buf++ << 8;
+
     return buf - hdr;
 }
 

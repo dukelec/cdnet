@@ -22,22 +22,12 @@
 #error "This library currently only supports little-endian"
 #endif
 
-#ifndef CDN_DEF_PORT
-#define CDN_DEF_PORT    0xcdcd
-#endif
-
-#ifndef CDN0_SHARE_LEFT
-#define CDN0_SHARE_LEFT 0x80
-#endif
-
 typedef enum {
     CDN_MULTI_NONE = 0,
     CDN_MULTI_CAST,
     CDN_MULTI_NET,
     CDN_MULTI_CAST_NET
 } cdn_multi_t;
-
-#define CDN_HDR_L0_REPLY    (1 << 6)
 
 
 typedef struct {
@@ -60,10 +50,6 @@ typedef struct {
     uint8_t         _s_mac;
     uint8_t         _d_mac;
     uint8_t         _l_net; // local net
-
-#ifdef CDN_L0_C             // L0 role central
-    uint8_t         _l0_lp; // last_port
-#endif
 
     uint8_t         conf;
     uint8_t         ret;    // bit7: 0: init, 1: finished (bit6~0: error code)

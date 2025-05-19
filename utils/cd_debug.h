@@ -10,13 +10,13 @@
 #ifndef __CD_DEBUG_H__
 #define __CD_DEBUG_H__
 
-#include "cdnet_core.h"
+#include "cd_utils.h"
 
 #ifndef d_printf
-#define d_printf(fmt, ...)          _dprintf(fmt, ## __VA_ARGS__)
+#define d_printf(fmt, ...)          printf(fmt, ## __VA_ARGS__)
 #endif
 #ifndef d_puts
-#define d_puts(str)                 _dputs(str)
+#define d_puts(str)                 d_printf("%s", str)
 #endif
 
 #define d_info(fmt, ...)            d_printf("I: " fmt, ## __VA_ARGS__)
@@ -70,11 +70,6 @@
 #define dnf_debug(name, ...)        do {} while (0)
 #endif
 
-void _dprintf(char *format, ...);
-void _dputs(char *str);
-void dhtoa(uint32_t val, char *buf);
-void debug_init(cdn_ns_t *ns, cdn_sockaddr_t *dst, bool *en);
-void debug_flush(bool wait_empty);
 
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);
 void hex_dump(const void *addr, int len);

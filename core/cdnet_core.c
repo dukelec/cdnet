@@ -67,11 +67,6 @@ void cdn_routine(cdn_ns_t *ns)
             pkt->frm = frame;
             pkt->_l_net = intf->net;
 
-#ifdef CDN_L0_C
-            if ((frame->dat[3] & 0xc0) == 0x40) // rx l0 reply
-                pkt->_l0_lp = intf->_l0_lp;
-#endif
-
             int ret = cdn_frame_r(pkt);
             if (!ret) {
                 cdn_sock_t *sock = cdn_sock_search(ns, pkt->dst.port);
@@ -99,11 +94,6 @@ int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
         d_verbose("tx: no intf found\n");
         return CDN_RET_ROUTE_ERR;
     }
-
-#ifdef CDN_L0_C
-    if (pkt->src.addr[0] == 0 && pkt->src.port == CDN_DEF_PORT)
-        intf->_l0_lp = pkt->dst.port;
-#endif
 
     ret = cdn_frame_w(pkt);
     if (ret)

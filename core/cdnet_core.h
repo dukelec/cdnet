@@ -33,10 +33,6 @@ typedef struct {
     // interface address
     uint8_t         net;
     uint8_t         mac;
-
-#ifdef CDN_L0_C                 // L0 role central
-    uint8_t         _l0_lp;     // last_port
-#endif
 } cdn_intf_t;
 
 typedef struct _cdn_ns {
