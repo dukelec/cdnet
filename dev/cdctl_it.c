@@ -76,6 +76,7 @@ void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high)
 void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud)
 {
     cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x00); // select osc
+    while (!(cdctl_reg_r(dev, CDREG_CLK_STATUS) & 0b100)) {}
     dn_info(dev->name, "version (clk: osc): %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 
     dev->sysclk = cdctl_sys_cal(target_baud);
@@ -92,6 +93,7 @@ void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud)
     cdctl_reg_w(dev, CDREG_PLL_CTRL, 0x10); // enable pll
     dn_info(dev->name, "clk_status: %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
     cdctl_reg_w(dev, CDREG_CLK_CTRL, 0x01); // select pll
+    while (!(cdctl_reg_r(dev, CDREG_CLK_STATUS) & 0b100)) {}
     dn_info(dev->name, "clk_status (clk: pll): %02x\n", cdctl_reg_r(dev, CDREG_CLK_STATUS));
     dn_info(dev->name, "version (clk: pll): %02x\n", cdctl_reg_r(dev, CDREG_VERSION));
 }
@@ -111,7 +113,6 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     dev->state = CDCTL_RST;
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
-    dev->rx_frame = NULL;
     dev->tx_wait_trigger = NULL;
     dev->tx_buf_clean_mask = false;
     dev->rx_cnt = 0;

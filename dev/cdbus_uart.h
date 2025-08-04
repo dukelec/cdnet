@@ -47,8 +47,7 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len);
 static inline void cduart_fill_crc(uint8_t *dat)
 {
     uint16_t crc_val = CDUART_CRC(dat, dat[2] + 3);
-    dat[dat[2] + 3] = crc_val & 0xff;
-    dat[dat[2] + 4] = crc_val >> 8;
+    put_unaligned16(crc_val, dat + 3 + dat[2]);
 }
 
 #endif

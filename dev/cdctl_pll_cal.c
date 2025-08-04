@@ -11,7 +11,8 @@
 #include "cdctl_pll_cal.h"
 
 
-pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output) {
+pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output)
+{
     pllcfg_t best = {0, 0, 0, 0xffffffff, 0xffffffff};
     uint32_t min_vco = 100e6L, max_vco = 500e6L, target_vco = 300e6L;
     uint32_t min_div_freq = 1e6L, max_div_freq = 15e6L, target_div_freq = 8e6L;
@@ -68,7 +69,8 @@ uint32_t cdctl_pll_get(uint32_t input, pllcfg_t cfg)
 }
 
 
-uint32_t cdctl_sys_cal(uint32_t baud) {
+uint32_t cdctl_sys_cal(uint32_t baud)
+{
     uint32_t best[2] = {0, 0xffffffff};
     uint32_t clk_max = 150e6L;
     uint32_t clk_min = 100e6L; // higher sysclk for higher spi clk
