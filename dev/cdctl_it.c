@@ -293,9 +293,9 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         cd_frame_t *frame = cd_list_get(dev->free_head);
         if (frame) {
             cd_list_put(&dev->rx_head, dev->rx_frame);
-            dev->rx_frame = frame;
             dev->rx_cnt++;
-            cdctl_rx_cb(dev, frame);
+            cdctl_rx_cb(dev, dev->rx_frame);
+            dev->rx_frame = frame;
         } else {
             dev->rx_no_free_node_cnt++;
         }
