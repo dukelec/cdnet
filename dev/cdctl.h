@@ -44,7 +44,7 @@ typedef struct {
     uint32_t        baud_h;
     uint8_t         filter_m[2];
 
-    uint8_t         mode; // 0: Arbitration, 1: Break Sync
+    uint8_t         mode; // 0: Traditional, 1: Arbitration, 2: Break Sync, 3: Full-duplex
     uint16_t        tx_permit_len;
     uint16_t        max_idle_len;
     uint8_t         tx_pre_len;
@@ -55,7 +55,7 @@ typedef struct {
     .baud_l = 115200,           \
     .baud_h = 115200,           \
     .filter_m = { 0xff, 0xff }, \
-    .mode = 0,                  \
+    .mode = 1,                  \
     .tx_permit_len = 0x14,      \
     .max_idle_len = 0xc8,       \
     .tx_pre_len = 0x01          \

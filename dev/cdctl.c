@@ -123,7 +123,7 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init, 
 #endif
     dev->spi = spi;
 
-    dn_info(dev->name, "init...\n");
+    dn_info(dev->name, "mode%d init...\n", init->mode);
     uint8_t ver = cdctl_reg_r(dev, CDREG_VERSION);
     dn_info(dev->name, "chip version: %02x\n", ver);
     if (ver != 0x10) {
@@ -138,7 +138,10 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init, 
 #endif
 
     uint8_t setting = (cdctl_reg_r(dev, CDREG_SETTING) & 0xf) | CDBIT_SETTING_TX_PUSH_PULL;
-    setting |= init->mode == 1 ? CDBIT_SETTING_BREAK_SYNC : CDBIT_SETTING_ARBITRATE;
+    if (init->mode == 1 || init->mode == 2)
+        setting |= init->mode << 4;
+    else if (init->mode == 3)
+        setting |= CDBIT_SETTING_FULL_DUPLEX;
     cdctl_reg_w(dev, CDREG_SETTING, setting);
     cdctl_reg_w(dev, CDREG_FILTER, init->mac);
     cdctl_reg_w(dev, CDREG_FILTER_M0, init->filter_m[0]);
