@@ -277,6 +277,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
     if (dev->state == CDCTL_RX_HEADER) {
         dev->state = CDCTL_RX_BODY;
         if (dev->rx_frame->dat[2] > min(CD_FRAME_SIZE - 3, 253)) {
+            gpio_set_high(dev->spi->ns_pin);
             dev->rx_len_err_cnt++;
             dev->state = CDCTL_REG_W;
             cdctl_reg_w_it(dev, CDREG_RX_CTRL, CDBIT_RX_CLR_PENDING | CDBIT_RX_RST_POINTER);
