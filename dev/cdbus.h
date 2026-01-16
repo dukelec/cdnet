@@ -28,9 +28,11 @@ typedef struct {
 
 #ifdef CD_IRQ_SAFE
 #define cd_list_get(head)               list_get_entry_it(head, cd_frame_t)
+#define cd_list_get_last(head)          list_get_last_entry_it(head, cd_frame_t)
 #define cd_list_put(head, frm)          list_put_it(head, &(frm)->node)
 #elif !defined(CD_USER_LIST)
 #define cd_list_get(head)               list_get_entry(head, cd_frame_t)
+#define cd_list_get_last(head)          list_get_last_entry(head, cd_frame_t)
 #define cd_list_put(head, frm)          list_put(head, &(frm)->node)
 #endif
 

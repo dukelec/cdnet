@@ -40,10 +40,14 @@ void list_move_begin(list_head_t *head, list_node_t *pre, list_node_t *node);
 
 #define list_get_entry(head, type)                              \
         list_entry_safe(list_get(head), type)
+#define list_get_last_entry(head, type)                         \
+        list_entry_safe(list_get_last(head), type)
 
 #ifdef CD_LIST_IT
 #define list_get_entry_it(head, type)                           \
         list_entry_safe(list_get_it(head), type)
+#define list_get_last_entry_it(head, type)                      \
+        list_entry_safe(list_get_last_it(head), type)
 #endif
 
 #define list_for_each(head, pre, pos)                           \
@@ -70,6 +74,16 @@ static inline list_node_t *list_get_it(list_head_t *head)
     list_node_t *node;
     local_irq_save(flags);
     node = list_get(head);
+    local_irq_restore(flags);
+    return node;
+}
+
+static inline list_node_t *list_get_last_it(list_head_t *head)
+{
+    uint32_t flags;
+    list_node_t *node;
+    local_irq_save(flags);
+    node = list_get_last(head);
     local_irq_restore(flags);
     return node;
 }

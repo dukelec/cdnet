@@ -143,6 +143,10 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 #ifndef CDCTL_AVOID_PIN_RE
     cdctl_reg_w(dev, CDREG_PIN_RE_CTRL, 0x10); // enable phy rx
 #endif
+    if (init->mode >= 4) {
+        dn_info(dev->name, "init abort, mode: %d\n", init->mode);
+        return -2;
+    }
 
     uint8_t setting = (cdctl_reg_r(dev, CDREG_SETTING) & 0xf) | CDBIT_SETTING_TX_PUSH_PULL;
     if (init->mode == 1 || init->mode == 2)
