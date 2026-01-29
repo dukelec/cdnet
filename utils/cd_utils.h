@@ -112,6 +112,54 @@
 #endif
 
 
+typedef volatile uint32_t cd_spinlock_t;
+
+static inline void cd_spin_lock(cd_spinlock_t *lock)
+{
+    while (__atomic_test_and_set(lock, __ATOMIC_ACQUIRE)) {}
+}
+
+static inline void cd_spin_unlock(cd_spinlock_t *lock)
+{
+    __atomic_clear(lock, __ATOMIC_RELEASE);
+}
+
+#define cd_spin_lock_irqsave(lock, flags)       \
+    do {                                        \
+        flags = _cd_spin_lock_irqsave(lock);    \
+    } while (0)
+
+static inline uint32_t _cd_spin_lock_irqsave(cd_spinlock_t *lock)
+{
+    uint32_t flags = _local_irq_save();
+    cd_spin_lock(lock);
+    return flags;
+}
+
+static inline void cd_spin_unlock_irqrestore(cd_spinlock_t *lock, uint32_t flags)
+{
+    cd_spin_unlock(lock);
+    local_irq_restore(flags);
+}
+
+#ifdef CD_SMP
+#define cd_irq_save     cd_spin_lock_irqsave
+#define cd_irq_restore  cd_spin_unlock_irqrestore
+#else
+#define cd_irq_save(lock, flags)        \
+    do {                                \
+        (void)(lock);                   \
+        local_irq_save(flags);          \
+    } while (0)
+
+#define cd_irq_restore(lock, flags)     \
+    do {                                \
+        (void)(lock);                   \
+        local_irq_restore(flags);       \
+    } while (0)
+#endif
+
+
 static inline uint16_t get_unaligned16(const uint8_t *p)
 {
     return p[0] | p[1] << 8;

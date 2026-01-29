@@ -15,9 +15,10 @@ typedef struct list_node {
 } list_node_t;
 
 typedef struct {
-    list_node_t *first;
-    list_node_t *last;
-    uint32_t    len;
+    list_node_t     *first;
+    list_node_t     *last;
+    uint32_t        len;
+    cd_spinlock_t   lock;
 } list_head_t;
 
 
@@ -72,9 +73,9 @@ static inline list_node_t *list_get_it(list_head_t *head)
 {
     uint32_t flags;
     list_node_t *node;
-    local_irq_save(flags);
+    cd_irq_save(&head->lock, flags);
     node = list_get(head);
-    local_irq_restore(flags);
+    cd_irq_restore(&head->lock, flags);
     return node;
 }
 
@@ -82,26 +83,26 @@ static inline list_node_t *list_get_last_it(list_head_t *head)
 {
     uint32_t flags;
     list_node_t *node;
-    local_irq_save(flags);
+    cd_irq_save(&head->lock, flags);
     node = list_get_last(head);
-    local_irq_restore(flags);
+    cd_irq_restore(&head->lock, flags);
     return node;
 }
 
 static inline void list_put_it(list_head_t *head, list_node_t *node)
 {
     uint32_t flags;
-    local_irq_save(flags);
+    cd_irq_save(&head->lock, flags);
     list_put(head, node);
-    local_irq_restore(flags);
+    cd_irq_restore(&head->lock, flags);
 }
 
 static inline void list_put_begin_it(list_head_t *head, list_node_t *node)
 {
     uint32_t flags;
-    local_irq_save(flags);
+    cd_irq_save(&head->lock, flags);
     list_put_begin(head, node);
-    local_irq_restore(flags);
+    cd_irq_restore(&head->lock, flags);
 }
 
 #endif // CD_LIST_IT
