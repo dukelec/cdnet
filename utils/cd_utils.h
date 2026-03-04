@@ -114,6 +114,7 @@
 
 typedef volatile uint32_t cd_spinlock_t;
 
+#ifdef CD_SMP
 static inline void cd_spin_lock(cd_spinlock_t *lock)
 {
     while (__atomic_test_and_set(lock, __ATOMIC_ACQUIRE)) {}
@@ -142,7 +143,6 @@ static inline void cd_spin_unlock_irqrestore(cd_spinlock_t *lock, uint32_t flags
     local_irq_restore(flags);
 }
 
-#ifdef CD_SMP
 #define cd_irq_save     cd_spin_lock_irqsave
 #define cd_irq_restore  cd_spin_unlock_irqrestore
 #else
