@@ -8,6 +8,8 @@ A CDBUS frame carrying a CDNET packet is structured as follows:
 or equivalently:  
 `[src, dst, len] + [CDNET header, payload] + [crc_l, crc_h]`
 
+More documentation: [wiki](https://github.com/dukelec/cdnet/wiki).
+
 
 ## CDNET Levels
 
