@@ -12,11 +12,33 @@
 
 #ifdef CD_ARCH_SPI_DMA
 
+#define CCR                 ctrl
+#define CNDTR               dtcnt
+#define CMAR                maddr
+#define CPAR                paddr
+#define ISR                 sts
+#define IFCR                clr
+#define DMA_CCR_EN          (1 << 0)
+#define DMA_CCR_TCIE        (1 << 1)
+#define DMA_CCR_MINC        (1 << 7)
+
+#define SR                  sts
+#define DR                  dt
+#define CR1                 ctrl1
+#define CR2                 ctrl2
+#define SPI_FLAG_BSY        (1 << 7)
+#define SPI_CR1_SPE         (1 << 6)
+#define SPI_CR2_RXDMAEN     (1 << 0)
+#define SPI_CR2_TXDMAEN     (1 << 1)
+
+#define SET_BIT(REG, BIT)   ((REG) |= (BIT))
+
+
 void spi_wr(spi_t *dev, const uint8_t *w_buf, uint8_t *r_buf, int len)
 {
-    DMA_TypeDef *dma = dev->dma_rx;
-    DMA_Channel_TypeDef *dma_r = dev->dma_ch_rx;
-    DMA_Channel_TypeDef *dma_t = dev->dma_ch_tx;
+    dma_type *dma = dev->dma_rx;
+    dma_channel_type *dma_r = dev->dma_ch_rx;
+    dma_channel_type *dma_t = dev->dma_ch_tx;
     uint32_t mask = dev->dma_mask;
 
     dma_r->CCR &= ~DMA_CCR_EN;
@@ -37,8 +59,8 @@ void spi_wr(spi_t *dev, const uint8_t *w_buf, uint8_t *r_buf, int len)
 
 void spi_wr_it(spi_t *dev, const uint8_t *w_buf, uint8_t *r_buf, int len)
 {
-    DMA_Channel_TypeDef *dma_r = dev->dma_ch_rx;
-    DMA_Channel_TypeDef *dma_t = dev->dma_ch_tx;
+    dma_channel_type *dma_r = dev->dma_ch_rx;
+    dma_channel_type *dma_t = dev->dma_ch_tx;
 
     dma_r->CCR &= ~DMA_CCR_EN;
     dma_r->CCR &= ~DMA_CCR_MINC;
@@ -80,6 +102,12 @@ void spi_wr_init(spi_t *dev)
 
 
 #ifdef CD_ARCH_CRC_HW
+
+#define INIT    idt
+#define CR      ctrl
+#ifndef DR
+#define DR      dt
+#endif
 
 #ifdef CD_ARCH_CRC_HW_IT
 static cd_spinlock_t crc_lock = {0};

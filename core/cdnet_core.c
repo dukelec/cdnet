@@ -59,7 +59,7 @@ void cdn_poll(cdn_ns_t *ns)
                 break;
             }
 
-            cd_frame_t *frame = dev->get_rx_frame(dev);
+            cd_frame_t *frame = dev->recv_frame(dev);
             if (!frame)
                 break;
             cdn_pkt_t *pkt = ns->rx_tmp;
@@ -98,7 +98,7 @@ int cdn_send_frame(cdn_ns_t *ns, cdn_pkt_t *pkt)
     ret = cdn_frame_w(pkt);
     if (ret)
         return CDN_RET_FMT_ERR;
-    intf->dev->put_tx_frame(intf->dev, pkt->frm);
+    intf->dev->send_frame(intf->dev, pkt->frm);
     pkt->frm = NULL;
     pkt->dat = NULL;
     return 0;

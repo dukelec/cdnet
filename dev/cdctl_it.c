@@ -34,21 +34,25 @@ void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 }
 
 
-cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev)
+cd_frame_t *cdctl_recv_frame(cd_dev_t *cd_dev)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
     return cd_list_get(&dev->rx_head);
 }
 
-void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
+void cdctl_send_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
-
     cd_list_put(&dev->tx_head, frame);
+retry:
     irq_disable(dev->int_irq);
-    if (dev->state == CDCTL_IDLE)
+    if (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN)
         cdctl_int_isr(dev);
+    // int_n may be asserted again here, setting a pending irq
+    // on platforms like esp32xx that pending irq is dropped on unmask, so the poll below re-triggers it
     irq_enable(dev->int_irq);
+    if (!gpio_get_val(dev->int_n) && (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN))
+        goto retry;
 }
 
 
@@ -106,8 +110,8 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
         dev->name = "cdctl";
     dev->rx_frame = cd_list_get(free_head);
     dev->free_head = free_head;
-    dev->cd_dev.get_rx_frame = cdctl_get_rx_frame;
-    dev->cd_dev.put_tx_frame = cdctl_put_tx_frame;
+    dev->cd_dev.recv_frame = cdctl_recv_frame;
+    dev->cd_dev.send_frame = cdctl_send_frame;
 
 #ifdef CD_USE_DYNAMIC_INIT
     dev->state = CDCTL_RST;

@@ -9,10 +9,8 @@
 
 #include <unistd.h>
 #include <time.h>
-
 #include "cd_utils.h"
 #include "cd_list.h"
-#include "arch_wrapper.h"
 
 
 uint32_t get_systick(void)

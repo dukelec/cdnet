@@ -80,12 +80,21 @@
  * to closest integer. Result is undefined for negative divisors and
  * for negative dividends if the divisor variable type is unsigned.
  */
-#define DIV_ROUND_CLOSEST(x, divisor)({                                     \
+#define DIV_ROUND_CLOSEST(x, divisor) ({                                    \
         typeof(x) __x = x;                                                  \
         typeof(divisor) __d = divisor;                                      \
         (((typeof(x))-1) > 0 || ((typeof(divisor))-1) > 0 || (__x) > 0) ?   \
                 (((__x) + ((__d) / 2)) / (__d)) :                           \
                 (((__x) - ((__d) / 2)) / (__d));                            \
+    })
+
+/*
+ * Divide signed x by 2^n (arithmetic shift right) and round to closest
+ * integer, ties away from zero: DIV_ROUND_POW2(-6, 2) == -2.
+ */
+#define DIV_ROUND_POW2(x, n) ({                                     \
+        typeof(x) __x = (x);                                        \
+        (__x + ((typeof(x))1 << ((n) - 1)) - (__x < 0)) >> (n);     \
     })
 
 #ifndef __weak
@@ -108,6 +117,7 @@
 #define clip(a, b, c) ((a) < (b) ? (b) : ((a) > (c) ? (c) : (a)))
 #endif
 #define DIV_ROUND_CLOSEST(x, divisor) (((x) + ((divisor) / 2)) / (divisor))
+#define DIV_ROUND_POW2(x, n) (((x) + (1LL << ((n) - 1)) - ((x) < 0)) >> (n))
 
 #endif
 

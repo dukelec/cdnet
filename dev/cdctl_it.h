@@ -42,7 +42,7 @@ typedef struct {
     cd_frame_t              *tx_wait_trigger;
     bool                    tx_buf_clean_mask;
 
-    uint8_t                 buf[2];
+    uint8_t                 buf[2] __attribute__((aligned(4)));
 
     volatile uint32_t       rx_cnt;
     volatile uint32_t       tx_cnt;
@@ -91,8 +91,8 @@ void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud);
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high);
 void cdctl_get_baud_rate(cdctl_dev_t *dev, uint32_t *low, uint32_t *high);
 
-cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev);
-void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
+cd_frame_t *cdctl_recv_frame(cd_dev_t *cd_dev);
+void cdctl_send_frame(cd_dev_t *cd_dev, cd_frame_t *frame);
 
 static inline void cdctl_flush(cdctl_dev_t *dev)
 {

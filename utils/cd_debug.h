@@ -71,6 +71,8 @@
 #endif
 
 
+char *put_hex8(char *p, uint8_t val);
+char *put_str(char *p, const char *s);
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);
 void hex_dump(const void *addr, int len);
 

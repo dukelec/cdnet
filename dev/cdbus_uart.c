@@ -11,13 +11,13 @@
 #include "cd_debug.h"
 
 
-static cd_frame_t *cduart_get_rx_frame(cd_dev_t *cd_dev)
+static cd_frame_t *cduart_recv_frame(cd_dev_t *cd_dev)
 {
     cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
     return cd_list_get(&dev->rx_head);
 }
 
-static void cduart_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
+static void cduart_send_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
     cduart_dev_t *dev = container_of(cd_dev, cduart_dev_t, cd_dev);
     cd_list_put(&dev->tx_head, frame);
@@ -30,8 +30,8 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
         dev->name = "cduart";
     dev->rx_frame = cd_list_get(free_head);
     dev->free_head = free_head;
-    dev->cd_dev.get_rx_frame = cduart_get_rx_frame;
-    dev->cd_dev.put_tx_frame = cduart_put_tx_frame;
+    dev->cd_dev.recv_frame = cduart_recv_frame;
+    dev->cd_dev.send_frame = cduart_send_frame;
 
     dev->t_last = get_systick();
     dev->rx_crc = 0xffff;

@@ -20,11 +20,21 @@
 #define CD_FRAME_SIZE   256
 #endif
 
+#ifndef CD_FRAME_TYPE
 typedef struct {
     list_node_t node;
-//  uint8_t     _pad;
+#ifdef CD_FRAME_PAD
+    uint8_t     _pad; // align body (dat+3) to 32-bit, for dma (e.g. esp32xx)
+#endif
     uint8_t     dat[CD_FRAME_SIZE];
 } cd_frame_t;
+#else
+#include CD_FRAME_TYPE // user defined cd_frame_t, e.g. "cd_frame.h"
+#endif
+
+#ifdef CD_FRAME_PAD
+_Static_assert((offsetof(cd_frame_t, dat) + 3) % 4 == 0, "dat+3 must be 32-bit aligned");
+#endif
 
 #ifdef CD_IRQ_SAFE
 #define cd_list_get(head)               list_get_entry_it(head, cd_frame_t)
@@ -37,8 +47,8 @@ typedef struct {
 #endif
 
 typedef struct cd_dev {
-    cd_frame_t *(* get_rx_frame)(struct cd_dev *cd_dev);
-    void (* put_tx_frame)(struct cd_dev *cd_dev, cd_frame_t *frame);
+    cd_frame_t *(* recv_frame)(struct cd_dev *cd_dev);
+    void (* send_frame)(struct cd_dev *cd_dev, cd_frame_t *frame);
 } cd_dev_t;
 
 #endif

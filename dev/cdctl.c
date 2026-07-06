@@ -39,13 +39,13 @@ static void cdctl_write_frame(cdctl_dev_t *dev, const cd_frame_t *frame)
 }
 
 
-cd_frame_t *cdctl_get_rx_frame(cd_dev_t *cd_dev)
+cd_frame_t *cdctl_recv_frame(cd_dev_t *cd_dev)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
     return cd_list_get(&dev->rx_head);
 }
 
-void cdctl_put_tx_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
+void cdctl_send_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
     cd_list_put(&dev->tx_head, frame);
@@ -104,8 +104,8 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init, 
     if (!dev->name)
         dev->name = "cdctl";
     dev->free_head = free_head;
-    dev->cd_dev.get_rx_frame = cdctl_get_rx_frame;
-    dev->cd_dev.put_tx_frame = cdctl_put_tx_frame;
+    dev->cd_dev.recv_frame = cdctl_recv_frame;
+    dev->cd_dev.send_frame = cdctl_send_frame;
 
 #ifdef CD_USE_DYNAMIC_INIT
     list_head_init(&dev->rx_head);
