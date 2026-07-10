@@ -85,9 +85,8 @@ void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud)
 
     dev->sysclk = cdctl_sys_cal(target_baud);
     pllcfg_t pll = cdctl_pll_cal(CDCTL_OSC_CLK, dev->sysclk);
-    uint32_t actual_freq = cdctl_pll_get(CDCTL_OSC_CLK, pll);
-    dn_info(dev->name, "sysclk %"PRIu32", actual: %"PRIu32"\n", dev->sysclk, actual_freq);
-    dev->sysclk = actual_freq;
+    dn_info(dev->name, "sysclk %"PRIu32", actual: %"PRIu32"\n", dev->sysclk, pll.freq);
+    dev->sysclk = pll.freq;
     cdctl_reg_w(dev, CDREG_PLL_N, pll.n);
     cdctl_reg_w(dev, CDREG_PLL_ML, pll.m & 0xff);
     cdctl_reg_w(dev, CDREG_PLL_OD_MH, (pll.d << 4) | (pll.m >> 8));

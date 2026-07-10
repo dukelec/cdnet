@@ -36,7 +36,7 @@ void hex_dump_small(char *pbuf, const void *addr, int len, int limit)
     int i;
     int dump_len = min(len, limit);
     const uint8_t *pc = (const uint8_t *)addr;
-    char tbuf[limit * 3 + 4]; // " xx" per byte + " ..." + '\0'
+    char tbuf[pbuf ? 1 : limit * 3 + 4]; // " xx" per byte + " ..." + '\0'
     char *p = pbuf ? pbuf : tbuf;
 
     for (i = 0; i < dump_len; i++) {

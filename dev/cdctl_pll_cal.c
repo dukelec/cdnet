@@ -13,7 +13,8 @@
 
 pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output)
 {
-    pllcfg_t best = {0, 0, 0, 0xffffffff, 0xffffffff};
+    pllcfg_t best = {0, 0, 0, 0};
+    uint32_t best_error = 0xffffffff, best_deviation = 0xffffffff;
     uint32_t min_vco = 100e6L, max_vco = 500e6L, target_vco = 300e6L;
     uint32_t min_div_freq = 1e6L, max_div_freq = 15e6L, target_div_freq = 8e6L;
 
@@ -42,12 +43,13 @@ pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output)
                 uint32_t vco_freq_deviation = abs((int32_t)(vco_freq - target_vco));
                 uint32_t total_deviation = div_freq_deviation * 10 + vco_freq_deviation;
 
-                if (error < best.error || (error == best.error && total_deviation < best.deviation)) {
+                if (error < best_error || (error == best_error && total_deviation < best_deviation)) {
                     best.n = n;
                     best.m = m;
                     best.d = d;
-                    best.error = error;
-                    best.deviation = total_deviation;
+                    best.freq = computed_output;
+                    best_error = error;
+                    best_deviation = total_deviation;
                 }
             }
         }
@@ -56,16 +58,6 @@ pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output)
     if (best.d == 2)
         best.d = 3;
     return best;
-}
-
-
-uint32_t cdctl_pll_get(uint32_t input, pllcfg_t cfg)
-{
-    if (cfg.d == 3)
-        cfg.d = 2;
-    uint32_t div_freq = DIV_ROUND_CLOSEST(input, cfg.n + 2);
-    uint32_t vco_freq = div_freq * (cfg.m + 2);
-    return vco_freq / (1 << cfg.d);
 }
 
 
