@@ -10,6 +10,10 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define local_irq_save(flags)       \
     do {                            \
         flags = _local_irq_save();  \
@@ -209,5 +213,9 @@ static inline void delay_systick(uint32_t val)
 }
 
 void delay_us(uint32_t us);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

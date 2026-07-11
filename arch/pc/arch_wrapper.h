@@ -10,6 +10,10 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define local_irq_save(flags)       \
     do { } while (0)
 #define local_irq_restore(flags)    \
@@ -24,6 +28,10 @@ uint32_t get_systick(void);
 
 #ifndef CD_SYSTICK_US_DIV
 #define CD_SYSTICK_US_DIV   1000
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif

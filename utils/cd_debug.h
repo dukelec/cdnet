@@ -12,6 +12,10 @@
 
 #include "cd_utils.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef d_printf
 #define d_printf(fmt, ...)          printf(fmt, ## __VA_ARGS__)
 #endif
@@ -75,5 +79,9 @@ char *put_hex8(char *p, uint8_t val);
 char *put_str(char *p, const char *s);
 void hex_dump_small(char *pbuf, const void *addr, int len, int max);
 void hex_dump(const void *addr, int len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

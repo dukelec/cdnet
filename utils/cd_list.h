@@ -10,6 +10,10 @@
 #ifndef __CD_LIST_H__
 #define __CD_LIST_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct list_node {
    struct list_node *next;
 } list_node_t;
@@ -106,5 +110,9 @@ static inline void list_put_begin_it(list_head_t *head, list_node_t *node)
 }
 
 #endif // CD_LIST_IT
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

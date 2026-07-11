@@ -13,6 +13,10 @@
 #include "cdbus.h"
 #include "cdctl_regs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef enum {
     CDCTL_RST = 0,
 
@@ -104,5 +108,9 @@ void cdctl_spi_isr(cdctl_dev_t *dev);
 
 void cdctl_rx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
 void cdctl_tx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -13,6 +13,10 @@
 #include "cdbus.h"
 #include "cdctl_regs.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     cd_dev_t    cd_dev;
     const char  *name;
@@ -81,5 +85,9 @@ static inline void cdctl_flush(cdctl_dev_t *dev)
 void cdctl_poll(cdctl_dev_t *dev);
 
 void cdctl_tx_cb(cdctl_dev_t *dev, cd_frame_t *frame);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -13,6 +13,10 @@
 #include "cdbus.h"
 #include "modbus_crc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef CDUART_IDLE_TIME
 #define CDUART_IDLE_TIME    (5000 / SYSTICK_US_DIV) // 5 ms
 #endif
@@ -49,5 +53,9 @@ static inline void cduart_fill_crc(uint8_t *dat)
     uint16_t crc_val = CDUART_CRC(dat, dat[2] + 3);
     put_unaligned16(crc_val, dat + 3 + dat[2]);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

@@ -10,6 +10,10 @@
 #ifndef __ARCH_WRAPPER_H__
 #define __ARCH_WRAPPER_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define CSR_MSTATUS     0x300
 #define SR_MIE          0x00000008
 #define CSR_STATUS      CSR_MSTATUS
@@ -185,5 +189,9 @@ static inline void delay_us(uint32_t us)
 {
     esp_rom_delay_us(us);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

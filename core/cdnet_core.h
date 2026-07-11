@@ -13,6 +13,10 @@
 #include "cdbus.h"
 #include "cdnet.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef CDN_INTF_MAX
 #define CDN_INTF_MAX            1
 #endif
@@ -91,5 +95,9 @@ static inline void cdn_pkt_free(cdn_ns_t *ns, cdn_pkt_t *pkt)
     }
     cdn_list_put(ns->free_pkt, pkt);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

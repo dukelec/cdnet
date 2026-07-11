@@ -10,6 +10,10 @@
 #ifndef __CDCTL_PLL_CAL_H__
 #define __CDCTL_PLL_CAL_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 typedef struct {
     uint8_t     n;
     uint16_t    m;
@@ -20,5 +24,9 @@ typedef struct {
 pllcfg_t cdctl_pll_cal(uint32_t input, uint32_t output);
 
 uint32_t cdctl_sys_cal(uint32_t baud);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

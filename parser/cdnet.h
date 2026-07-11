@@ -13,6 +13,10 @@
 #include "cd_utils.h"
 #include "cd_list.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifndef cdn_assert
 #define CDN_ERR_ASSERT  -1
 #define cdn_assert(expr) { if (!(expr)) return CDN_ERR_ASSERT; }
@@ -101,5 +105,9 @@ static inline int cdn_frame_r(cdn_pkt_t *pkt)
         return cdn1_frame_r(pkt);
     return cdn0_frame_r(pkt);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
