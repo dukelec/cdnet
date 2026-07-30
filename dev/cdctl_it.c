@@ -160,6 +160,7 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
     cdctl_reg_w(dev, CDREG_FILTER, init->mac);
     cdctl_reg_w(dev, CDREG_FILTER_M0, init->filter_m[0]);
     cdctl_reg_w(dev, CDREG_FILTER_M1, init->filter_m[1]);
+    cdctl_reg_w(dev, CDREG_IDLE_WAIT_LEN, init->idle_wait_len);
     cdctl_reg_w(dev, CDREG_TX_PERMIT_LEN_L, init->tx_permit_len & 0xff);
     cdctl_reg_w(dev, CDREG_TX_PERMIT_LEN_H, init->tx_permit_len >> 8);
     cdctl_reg_w(dev, CDREG_MAX_IDLE_LEN_L, init->max_idle_len & 0xff);
