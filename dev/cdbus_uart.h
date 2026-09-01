@@ -27,6 +27,14 @@ extern "C" {
 #define CDUART_CRC_SUB      crc16_sub
 #endif
 
+// CDUART_BCAST_SEQ_REPLY: serialize replies to a broadcast from the host (mac 0)
+// on a plain UART bus (no CDCTL arbitration): mac 1 replies immediately, mac N
+// (N > 1) holds its tx until it sees the reply of mac N-1 to the host, or times
+// out; unicast requests are never delayed.
+#ifndef CDUART_BCAST_WAIT_TIMEOUT
+#define CDUART_BCAST_WAIT_TIMEOUT   (50000 / SYSTICK_US_DIV) // 50 ms
+#endif
+
 typedef struct cduart_dev {
     cd_dev_t            cd_dev;
     const char          *name;
@@ -42,11 +50,18 @@ typedef struct cduart_dev {
     uint32_t            t_last;     // last receive time
 
     uint8_t             local_mac;
+#ifdef CDUART_BCAST_SEQ_REPLY
+    bool                tx_hold;    // wait for reply of mac-1 before tx
+    uint32_t            t_hold;     // time the hold started
+#endif
 } cduart_dev_t;
 
 
 void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head);
 void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len);
+
+// true while tx must be held back (broadcast reply ordering), clears on timeout
+bool cduart_tx_hold(cduart_dev_t *dev);
 
 static inline void cduart_fill_crc(uint8_t *dat)
 {

@@ -43,6 +43,9 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
     dev->rx_byte_cnt = 0;
     dev->rx_drop = false;
 #endif
+#ifdef CDUART_BCAST_SEQ_REPLY
+    dev->tx_hold = false;
+#endif
 }
 
 
@@ -88,11 +91,24 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
         rd += cpy_len;
 
         if (dev->rx_byte_cnt == frame->dat[2] + 5) {
+#ifdef CDUART_BCAST_SEQ_REPLY
+            // header is always kept (also for dropped frames), so a dropped
+            // "mac-1 -> host" reply still releases the hold
+            if (dev->tx_hold && frame->dat[0] == dev->local_mac - 1 && frame->dat[1] == 0)
+                dev->tx_hold = false;
+#endif
             if (!dev->rx_drop) {
                 if (dev->rx_crc != 0) {
                     dn_error(dev->name, "crc error, hdr: %02x %02x %02x\n",
                             frame->dat[0], frame->dat[1], frame->dat[2]);
                 } else {
+#ifdef CDUART_BCAST_SEQ_REPLY
+                    if (frame->dat[1] == 0xff && frame->dat[0] == 0 &&
+                            dev->local_mac > 1 && dev->local_mac != 0xff) {
+                        dev->tx_hold = true;
+                        dev->t_hold = get_systick();
+                    }
+#endif
                     cd_frame_t *frm = cd_list_get(dev->free_head);
                     if (frm) {
 #ifdef CD_VERBOSE
@@ -113,4 +129,18 @@ void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
             dev->rx_drop = false;
         }
     }
+}
+
+
+bool cduart_tx_hold(cduart_dev_t *dev)
+{
+#ifdef CDUART_BCAST_SEQ_REPLY
+    if (dev->tx_hold && get_systick() - dev->t_hold > CDUART_BCAST_WAIT_TIMEOUT) {
+        dn_warn(dev->name, "bcast wait timeout\n");
+        dev->tx_hold = false;
+    }
+    return dev->tx_hold;
+#else
+    return false;
+#endif
 }
