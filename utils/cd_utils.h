@@ -76,14 +76,15 @@
 #endif
 
 /*
- * Divide positive or negative dividend by positive divisor and round
- * to closest integer. Result is undefined for negative divisors and
- * for negative dividends if the divisor variable type is unsigned.
+ * Divide and round to the closest integer; dividend and divisor may each be
+ * positive or negative, unless either is of an unsigned type: then both
+ * must be non-negative (a negative operand would be converted to unsigned).
  */
 #define DIV_ROUND_CLOSEST(x, divisor) ({                                    \
         typeof(x) __x = x;                                                  \
         typeof(divisor) __d = divisor;                                      \
-        (((typeof(x))-1) > 0 || ((typeof(divisor))-1) > 0 || (__x) > 0) ?   \
+        (((typeof(x))-1) > 0 || ((typeof(divisor))-1) > 0 ||                \
+                (((__x) > 0) == ((__d) > 0))) ?                             \
                 (((__x) + ((__d) / 2)) / (__d)) :                           \
                 (((__x) - ((__d) / 2)) / (__d));                            \
     })
