@@ -51,8 +51,8 @@ void cduart_dev_init(cduart_dev_t *dev, list_head_t *free_head)
 
 void cduart_rx_handle(cduart_dev_t *dev, const uint8_t *buf, unsigned len)
 {
-    unsigned max_len;
-    unsigned cpy_len;
+    int max_len; // signed: a negative remainder must not wrap into a huge copy
+    int cpy_len;
     const uint8_t *rd = buf;
 
     while (true) {

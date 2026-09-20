@@ -59,8 +59,8 @@ retry:
 void cdctl_set_baud_rate(cdctl_dev_t *dev, uint32_t low, uint32_t high)
 {
     uint16_t l, h;
-    l = min(65535, max(2, DIV_ROUND_CLOSEST(dev->sysclk, low) - 1));
-    h = min(65535, max(2, DIV_ROUND_CLOSEST(dev->sysclk, high) - 1));
+    l = clip((int32_t)DIV_ROUND_CLOSEST(dev->sysclk, low) - 1, 2, 65535);
+    h = clip((int32_t)DIV_ROUND_CLOSEST(dev->sysclk, high) - 1, 2, 65535);
     cdctl_reg_w(dev, CDREG_DIV_LS_L, l & 0xff);
     cdctl_reg_w(dev, CDREG_DIV_LS_H, l >> 8);
     cdctl_reg_w(dev, CDREG_DIV_HS_L, h & 0xff);

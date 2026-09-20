@@ -22,9 +22,6 @@ uint32_t get_systick(void)
 
 void _dprintf(char* format, ...)
 {
-    uint32_t flags;
-    list_node_t *node;
-
     va_list args;
     va_start (args, format);
     vprintf (format, args);
