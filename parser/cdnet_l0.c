@@ -66,6 +66,7 @@ int cdn0_frame_r(cdn_pkt_t *pkt)
     int len = cdn0_hdr_r(pkt, frame + 3);
     if (len < 0)
         return len;
+    cdn_assert(frame[2] >= len); // len byte must at least cover the header
     pkt->dat = frame + 3 + len;
     pkt->len = frame[2] - len;
     return 0;
