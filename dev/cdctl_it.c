@@ -15,22 +15,55 @@
                     CDBIT_FLAG_TX_CD | CDBIT_FLAG_TX_ERROR)
 
 
+// move state to `to` if it is not above `from_max`, returns the state before
+static cdctl_state_t cdctl_state_cas(cdctl_dev_t *dev, cdctl_state_t from_max, cdctl_state_t to)
+{
+    uint32_t flags;
+    cd_irq_save(&dev->lock, flags);
+    cdctl_state_t st = dev->state;
+    if (st <= from_max)
+        dev->state = to;
+    cd_irq_restore(&dev->lock, flags);
+    return st;
+}
+
+// restart the state machine if int_n is asserted or a frame waits in tx_head
+static inline void cdctl_kick(cdctl_dev_t *dev)
+{
+    if (!gpio_get_val(dev->int_n) || (!dev->tx_wait_trigger && dev->tx_head.first))
+        cdctl_int_isr(dev);
+}
+
+// take the spi from the state machine: wait for it to pause between two
+// transfers, then park it in CDCTL_REG_MANUAL so cdctl_int_isr() stays out
+static cdctl_state_t cdctl_manual_begin(cdctl_dev_t *dev)
+{
+    cdctl_state_t st; // spin with irq on, the dma irq has to finish the transfer
+    while ((st = cdctl_state_cas(dev, CDCTL_WAIT_TX_CLEAN, CDCTL_REG_MANUAL)) > CDCTL_WAIT_TX_CLEAN);
+    return st;
+}
+
+static void cdctl_manual_end(cdctl_dev_t *dev, cdctl_state_t st)
+{
+    dev->state = st; // nobody else touches state while it is CDCTL_REG_MANUAL
+    if (st != CDCTL_RST)
+        cdctl_kick(dev); // an int_n or a frame queued meanwhile was turned away
+}
+
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg)
 {
     uint8_t dat = 0xff;
-    irq_disable(dev->int_irq);
-    while (dev->state > CDCTL_WAIT_TX_CLEAN);
+    cdctl_state_t st = cdctl_manual_begin(dev);
     spi_mem_read(dev->spi, reg, &dat, 1);
-    irq_enable(dev->int_irq);
+    cdctl_manual_end(dev, st);
     return dat;
 }
 
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 {
-    irq_disable(dev->int_irq);
-    while (dev->state > CDCTL_WAIT_TX_CLEAN);
+    cdctl_state_t st = cdctl_manual_begin(dev);
     spi_mem_write(dev->spi, reg | 0x80, &val, 1);
-    irq_enable(dev->int_irq);
+    cdctl_manual_end(dev, st);
 }
 
 
@@ -44,15 +77,7 @@ void cdctl_send_frame(cd_dev_t *cd_dev, cd_frame_t *frame)
 {
     cdctl_dev_t *dev = container_of(cd_dev, cdctl_dev_t, cd_dev);
     cd_list_put(&dev->tx_head, frame);
-retry:
-    irq_disable(dev->int_irq);
-    if (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN)
-        cdctl_int_isr(dev);
-    // int_n may be asserted again here, setting a pending irq
-    // on platforms like esp32xx that pending irq is dropped on unmask, so the poll below re-triggers it
-    irq_enable(dev->int_irq);
-    if (!gpio_get_val(dev->int_n) && (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN))
-        goto retry;
+    cdctl_int_isr(dev); // starts the state machine if it is idle, else the frame waits in tx_head
 }
 
 
@@ -103,7 +128,7 @@ void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud)
 
 
 int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *int_n, irq_t int_irq)
+        spi_t *spi, gpio_t *int_n)
 {
     if (!dev->name)
         dev->name = "cdctl";
@@ -114,6 +139,7 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 
 #ifdef CD_USE_DYNAMIC_INIT
     dev->state = CDCTL_RST;
+    dev->lock = 0;
     list_head_init(&dev->rx_head);
     list_head_init(&dev->tx_head);
     dev->tx_wait_trigger = NULL;
@@ -131,7 +157,6 @@ int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
 
     dev->spi = spi;
     dev->int_n = int_n;
-    dev->int_irq = int_irq;
 
     dn_info(dev->name, "mode%d init...\n", init->mode);
     uint8_t ver = cdctl_reg_r(dev, CDREG_VERSION);
@@ -196,13 +221,14 @@ static inline void cdctl_reg_w_it(cdctl_dev_t *dev, uint8_t reg, uint8_t val)
 }
 
 
-// int_n pin interrupt isr
+// int_n pin interrupt isr, also the entry for cdctl_send_frame() from any context:
+// the idle check and the claim are one atomic step, so only one caller wins
 void cdctl_int_isr(cdctl_dev_t *dev)
 {
-    if (dev->state == CDCTL_IDLE || dev->state == CDCTL_WAIT_TX_CLEAN) {
-        dev->state = CDCTL_RD_FLAG;
+    if (dev->state == CDCTL_RST) // before cdctl_dev_init, RST only ever moves forward
+        return;
+    if (cdctl_state_cas(dev, CDCTL_WAIT_TX_CLEAN, CDCTL_RD_FLAG) <= CDCTL_WAIT_TX_CLEAN)
         cdctl_reg_r_it(dev, CDREG_INT_FLAG);
-    }
 }
 
 // dma finish callback
@@ -268,8 +294,7 @@ void cdctl_spi_isr(cdctl_dev_t *dev)
         }
 
         dev->state = dev->tx_wait_trigger ? CDCTL_WAIT_TX_CLEAN : CDCTL_IDLE;
-        if (!gpio_get_val(dev->int_n))
-            cdctl_int_isr(dev);
+        cdctl_kick(dev); // a frame queued by a higher priority irq saw us busy
         return;
     }
 

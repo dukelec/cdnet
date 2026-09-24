@@ -27,7 +27,9 @@ typedef enum {
 
     CDCTL_RX_HEADER,
     CDCTL_RX_BODY,
-    CDCTL_TX_FRAME
+    CDCTL_TX_FRAME,
+
+    CDCTL_REG_MANUAL    // blocking cdctl_reg_r / cdctl_reg_w holds the spi
 } cdctl_state_t;
 
 typedef struct {
@@ -36,6 +38,7 @@ typedef struct {
     uint32_t                sysclk;
 
     volatile cdctl_state_t  state;
+    cd_spinlock_t           lock;       // guards the state transitions out of idle
 
     list_head_t             *free_head;
     list_head_t             rx_head;
@@ -60,7 +63,6 @@ typedef struct {
 
     spi_t                   *spi;
     gpio_t                  *int_n;
-    irq_t                   int_irq;
 } cdctl_dev_t;
 
 typedef struct {
@@ -89,8 +91,10 @@ typedef struct {
 }
 
 int cdctl_dev_init(cdctl_dev_t *dev, list_head_t *free_head, cdctl_cfg_t *init,
-        spi_t *spi, gpio_t *int_n, irq_t int_irq);
+        spi_t *spi, gpio_t *int_n);
 
+// blocking register access, waits for the state machine to pause between two
+// spi transfers; not for use in an irq that can preempt the spi dma irq
 uint8_t cdctl_reg_r(cdctl_dev_t *dev, uint8_t reg);
 void cdctl_reg_w(cdctl_dev_t *dev, uint8_t reg, uint8_t val);
 void cdctl_set_clk(cdctl_dev_t *dev, uint32_t target_baud);
