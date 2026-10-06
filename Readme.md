@@ -1,7 +1,7 @@
 CDNET: Optional High-Layer Protocol for CDBUS
 =======================================
 
-Protocol status: Stable [Version 2.0]
+Protocol status: Stable [Version 2.1]
 
 A CDBUS frame carrying a CDNET packet is structured as:  
 `[src, dst, len] + [CDNET package] + [crc_l, crc_h]`  
@@ -140,15 +140,20 @@ The model field should be included at minimum.
 ## CDNET Address String Formats
 
 ```
-           localhost      local link     unique local    multicast
+           localhost      link local     unique local    multicast (local net / cross net)
             10:00:00
 level0:                    00:NN:MM
-level1:                    80:NN:MM        a0:NN:MM       f0:MH:ML
+level1:                    80:NN:MM        a0:NN:MM       90:MH:ML / b0:MH:ML
 ```
 
 Notes:
   - NN: net_id, MM: mac_addr, MH/ML: multicast_id (H: high byte, L: low byte)
-  - String address format is analogous to IPv6
+  - Address categories are analogous to IPv6: loopback, link local, unique local, multicast
+  - The first byte is the address type:
+    * bit7 set: the level 1 header byte with the PORT_SIZE bits cleared,
+      i.e. `0x80 | MULTI_NET << 5 | MULTICAST << 4`;
+      the header is derived from the destination type, the source type is `80` or `a0`
+    * bit7 clear: a local tag that is never sent on the bus, `00` selects level 0, `10` is localhost
 
 
 ## Examples

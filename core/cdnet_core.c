@@ -15,7 +15,8 @@
 __weak cdn_intf_t *cdn_route(cdn_ns_t *ns, cdn_pkt_t *pkt)
 {
     cdn_intf_t *intf = &ns->intfs[0];
-    pkt->src.addr[0] = pkt->dst.addr[0] != 0xf0 ? pkt->dst.addr[0] : 0x80; // or 0xa0
+    // 00 for level 0; 80 or a0 for level 1, multicast 90 / b0 included
+    pkt->src.addr[0] = pkt->dst.addr[0] & 0xa0;
     pkt->src.addr[1] = intf->net;
     pkt->src.addr[2] = intf->mac;
     pkt->_s_mac = intf->mac;

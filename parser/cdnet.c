@@ -18,10 +18,11 @@ int cdn_hdr_size_pkt(const cdn_pkt_t *pkt)
     if (pkt->src.addr[0] == 0x00)   // level 0
         return 2;
 
+    // level 1: dst type byte is the header byte, bit5: MULTI_NET, bit4: MULTICAST
     int hdr_size = 1;
-    if (pkt->src.addr[0] == 0xa0)
+    if (pkt->dst.addr[0] & 0x20)
         hdr_size += 4;
-    else if (pkt->dst.addr[0] == 0xf0)
+    else if (pkt->dst.addr[0] & 0x10)
         hdr_size += 2;
 
     hdr_size += pkt->src.port <= 0xff ? 1 : 2;

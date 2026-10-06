@@ -16,14 +16,12 @@ int cdn1_hdr_w(const cdn_pkt_t *pkt, uint8_t *hdr)
     const cdn_sockaddr_t *src = &pkt->src;
     const cdn_sockaddr_t *dst = &pkt->dst;
     uint8_t *buf = hdr + 1;
-    cdn_multi_t multi = CDN_MULTI_NONE;
 
-    if (src->addr[0] == 0xa0)
-        multi |= CDN_MULTI_NET;
-    if (dst->addr[0] == 0xf0)
-        multi |= CDN_MULTI_CAST;
-
-    *hdr = 0x80 | (multi << 4); // hdr
+    // the dst type byte is the header byte with the PORT_SIZE bits cleared:
+    // 80: local link, a0: unique local, 90: local multicast, b0: cross net multicast
+    cdn_assert((dst->addr[0] & 0xcf) == 0x80);
+    cdn_multi_t multi = (dst->addr[0] >> 4) & 3;
+    *hdr = dst->addr[0]; // hdr
 
     if (multi & CDN_MULTI_NET) {
         *buf++ = src->addr[1];
@@ -81,12 +79,11 @@ int cdn1_hdr_r(cdn_pkt_t *pkt, const uint8_t *hdr)
         src->addr[1] = pkt->_l_net;
         src->addr[2] = pkt->_s_mac;
     }
+    dst->addr[0] = *hdr & 0xb0; // 80, 90, a0 or b0
     if (multi != CDN_MULTI_NONE) {
-        dst->addr[0] = (multi & CDN_MULTI_CAST) ? 0xf0 : 0xa0;
         dst->addr[1] = *buf++;
         dst->addr[2] = *buf++;
     } else {
-        dst->addr[0] = 0x80;
         dst->addr[1] = pkt->_l_net;
         dst->addr[2] = pkt->_d_mac;
     }
